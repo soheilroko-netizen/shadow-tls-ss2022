@@ -7,6 +7,8 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
 #[cfg(target_os = "windows")]
+use std::process::Command;
+#[cfg(target_os = "windows")]
 use wintun::Session;
 
 /// TUN adapter configuration
@@ -141,6 +143,16 @@ impl TunManager {
         
         set_adapter_address(&adapter, ip, mask)?;
 
+        // Add route: send all traffic through TUN (0.0.0.0/0 -> stls0 gateway)
+        let route_output = Command::new("route")
+            .args(["add", "0.0.0.0", "mask", "0.0.0.0", ip, "metric", "1"])
+            .output()
+            .context("Failed to run route command")?;
+        
+        if !route_output.status.success() {
+            eprintln!("Route add failed: {}", String::from_utf8_lossy(&route_output.stderr));
+        }
+
         // Start the session
         let session = adapter.start_session(wintun::MAX_RING_CAPACITY)
             .context("Failed to start TUN session")?;
@@ -177,14 +189,16 @@ impl TunManager {
 
         self.running.store(false, Ordering::Relaxed);
         
-        if let Some(handle) = self.worker_handle.take() {
-            let _ = handle.join();
-        }
-
+        // Drop session first — this unblocks receive_blocking()
         #[cfg(target_os = "windows")]
         {
             self.session = None;
             self.adapter = None;
+        }
+
+        // Now join should complete quickly
+        if let Some(handle) = self.worker_handle.take() {
+            let _ = handle.join();
         }
 
         Ok("TUN stopped".into())
