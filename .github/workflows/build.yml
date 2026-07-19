@@ -1,10 +1,10 @@
-name: Build stls v2 (Tauri GUI + bundled sing-box)
+name: Build stls v3 (TUN VPN + bundled sing-box)
 
 on:
   push:
-    branches: [v2]
+    branches: [v3]
   pull_request:
-    branches: [v2]
+    branches: [v3]
   workflow_dispatch:
 
 jobs:
@@ -25,12 +25,17 @@ jobs:
       - name: Download sing-box (Windows x86_64)
         shell: pwsh
         run: |
-          $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/SagerNet/sing-box/releases/latest" `
-            -Headers @{ "User-Agent" = "stls" }
-          $tag = $release.tag_name
-          $version = $tag.TrimStart('v')
+          # Pinned to 1.10.7 — the last release before the inbound legacy
+          # field / DNS server / domain_resolver deprecation waves that
+          # broke our config six builds in a row. Migrating to 1.13.x
+          # config schema is a separate effort; for now ship a known-good
+          # version whose schema matches what proxy.rs generates.
+          $tag = "1.10.7"
+          $version = $tag
           $assetName = "sing-box-$version-windows-amd64.zip"
+          $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/SagerNet/sing-box/releases/tags/$tag" `
+            -Headers @{ "User-Agent" = "stls"; "Authorization" = "Bearer ${{ secrets.GITHUB_TOKEN }}" }
           $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
           if (-not $asset) {
             throw "Asset $assetName not found in release $tag"
