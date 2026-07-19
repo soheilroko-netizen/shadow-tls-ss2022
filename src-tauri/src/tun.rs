@@ -5,7 +5,6 @@ use anyhow::{bail, Context, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use wintun::Session;
@@ -41,7 +40,7 @@ pub struct TunManager {
     #[cfg(target_os = "windows")]
     session: Option<Arc<Session>>,
     #[cfg(target_os = "windows")]
-    adapter: Option<wintun::Adapter>,
+    adapter: Option<Arc<wintun::Adapter>>,
     worker_handle: Option<JoinHandle<Result<()>>>,
 }
 
@@ -159,7 +158,7 @@ impl TunManager {
 
 /// Set IP address on the TUN adapter (Windows-specific)
 #[cfg(target_os = "windows")]
-fn set_adapter_address(adapter: &wintun::Adapter, ip: &str, prefix_len: u8) -> Result<()> {
+fn set_adapter_address(adapter: &Arc<wintun::Adapter>, ip: &str, prefix_len: u8) -> Result<()> {
     use std::process::Command;
     
     // Use netsh to configure the interface
@@ -193,12 +192,11 @@ fn packet_worker(
 ) -> Result<()> {
     while running.load(Ordering::Relaxed) {
         // Read packet from TUN
-        let pkt = match session.receive_blocking(Duration::from_millis(100)) {
+        let pkt = match session.receive_blocking() {
             Ok(pkt) => pkt,
-            Err(wintun::RecvError::Timeout) => continue,
             Err(e) => {
                 if running.load(Ordering::Relaxed) {
-                    log::error!("TUN receive error: {:?}", e);
+                    eprintln!("TUN receive error: {:?}", e);
                 }
                 break;
             }
@@ -213,8 +211,6 @@ fn packet_worker(
         // 2. Connect to SOCKS5 proxy
         // 3. Forward packet payload
         // 4. Route response back to TUN
-        
-        pkt.release();
     }
     
     Ok(())
