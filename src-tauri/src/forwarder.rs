@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 
 use crate::packet::{
     ConnKey, Ipv4Header, Packet, TcpHeader, UdpHeader,
-    TCP_SYN, TCP_ACK, TCP_FIN, TCP_RST,
+    TCP_SYN, TCP_ACK, TCP_FIN, TCP_RST, TCP_PSH,
 };
 use crate::socks5::Socks5Stream;
 
