@@ -91,3 +91,9 @@ impl Write for Socks5Stream {
         self.inner.flush()
     }
 }
+
+impl From<Socks5Stream> for std::net::TcpStream {
+    fn from(s: Socks5Stream) -> Self {
+        s.inner
+    }
+}
