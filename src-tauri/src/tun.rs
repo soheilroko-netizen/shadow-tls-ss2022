@@ -82,18 +82,18 @@ impl TunManager {
             }
             // Tauri resource dir for different install types
             if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                let base = std::path::PathBuf::from(local).join("stls");
+                let base = std::path::PathBuf::from(&local).join("stls");
                 candidates.push(base.join("wintun.dll"));
                 candidates.push(base.join("bin").join("wintun.dll"));
-                let base2 = std::path::PathBuf::from(local).join("com.stls.app");
+                let base2 = std::path::PathBuf::from(&local).join("com.stls.app");
                 candidates.push(base2.join("wintun.dll"));
                 candidates.push(base2.join("bin").join("wintun.dll"));
             }
             if let Ok(roaming) = std::env::var("APPDATA") {
-                let base = std::path::PathBuf::from(roaming).join("stls");
+                let base = std::path::PathBuf::from(&roaming).join("stls");
                 candidates.push(base.join("wintun.dll"));
                 candidates.push(base.join("bin").join("wintun.dll"));
-                let base2 = std::path::PathBuf::from(roaming).join("com.stls.app");
+                let base2 = std::path::PathBuf::from(&roaming).join("com.stls.app");
                 candidates.push(base2.join("wintun.dll"));
                 candidates.push(base2.join("bin").join("wintun.dll"));
             }
