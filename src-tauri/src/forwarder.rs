@@ -183,10 +183,26 @@ pub fn run(
             };
 
             match pkt {
-                Packet::Ipv4(ip) => handle_ipv4(
-                    ip, raw, &tcp_conns, &tun_writer,
-                    &socks5_addr, socks5_port, &running,
-                ).await,
+                Packet::Ipv4(ip) => {
+                    let payload = ip.payload(raw);
+                    if ip.is_tcp() {
+                        if let Some(tcp) = TcpHeader::parse(payload) {
+                            eprintln!("[TUN] TCP {}:{} -> {}:{} syn={} ack={} len={}",
+                                ip.src, tcp.src_port, ip.dst, tcp.dst_port,
+                                tcp.is_syn(), tcp.is_ack(), payload.len() - tcp.header_len());
+                        }
+                    } else if ip.is_udp() {
+                        if let Some(udp) = UdpHeader::parse(payload) {
+                            eprintln!("[TUN] UDP {}:{} -> {}:{} len={}",
+                                ip.src, udp.src_port, ip.dst, udp.dst_port,
+                                payload.len() - 8);
+                        }
+                    }
+                    handle_ipv4(
+                        ip, raw, &tcp_conns, &tun_writer,
+                        &socks5_addr, socks5_port, &running,
+                    ).await
+                }
                 Packet::Ipv6(_) => { /* drop */ }
             }
         }
