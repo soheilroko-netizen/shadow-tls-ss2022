@@ -42,19 +42,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = (gh release list --repo SagerNet/sing-box --limit 1 --json tagName --jq '.[0].tagName')
-          Write-Host "Latest sing-box release: $tag"
-          $url = "https://github.com/SagerNet/sing-box/releases/download/$tag/sing-box-$tag-windows-amd64.zip"
+          $releases = gh release list --repo SagerNet/sing-box --limit 20 --json tagName,isPrerelease
+          $tag = ($releases | ConvertFrom-Json | Where-Object { -not $_.isPrerelease } | Select-Object -First 1).tagName
+          Write-Host "Latest stable sing-box release: $tag"
+          $ver = $tag.TrimStart('v')
+          $url = "https://github.com/SagerNet/sing-box/releases/download/$tag/sing-box-$ver-windows-amd64.zip"
+          Write-Host "Downloading from: $url"
           Invoke-WebRequest -Uri $url -OutFile "sing-box.zip"
           Expand-Archive -Path "sing-box.zip" -DestinationPath "sing-box-staged" -Force
           Remove-Item "sing-box.zip" -Force
-          Move-Item "sing-box-staged\\sing-box-*-windows-amd64\\sing-box.exe" "src-tauri\\bin\\sing-box.exe" -Force
+          Move-Item "sing-box-staged\sing-box-$ver-windows-amd64\sing-box.exe" "src-tauri\bin\sing-box.exe" -Force
           Remove-Item -Recurse -Force "sing-box-staged"
-          Write-Host "sing-box.exe ready at src-tauri\\bin\\sing-box.exe"
-          if (-not (Test-Path "src-tauri\\bin\\sing-box.exe")) {
+          Write-Host "sing-box.exe ready at src-tauri\bin\sing-box.exe"
+          if (-not (Test-Path "src-tauri\bin\sing-box.exe")) {
             throw "sing-box.exe missing after move"
           }
-          Get-Item "src-tauri\\bin\\sing-box.exe" | Select-Object Name, Length, FullName
+          Get-Item "src-tauri\bin\sing-box.exe" | Select-Object Name, Length, FullName
 
       # ---------------------------------------------------------------
       # 2. Frontend (pnpm + Vite)
