@@ -131,10 +131,27 @@ pub fn run(
     socks5_addr: String,
     socks5_port: u16,
 ) -> Result<()> {
+    // Spawn async worker (moves session/data into ZST task)
     let rt = tokio::runtime::Runtime::new()
         .context("Failed to create tokio runtime")?;
+    rt.spawn(async move {
+        packet_worker(session, running, socks5_addr, socks5_port).await
+    });
+    Ok(())
+}
 
-    let tun_writer = Arc::new(TunWriter::new(session.clone()));
+/// Background task: read from TUN, forward to SOCKS5
+async fn packet_worker(
+    session: Arc<wintun::Session>,
+    running: Arc<AtomicBool>,
+    socks5_addr: String,
+    socks5_port: u16,
+) -> Result<()> {
+    // Packet statistics
+    let mut packets_rx = 0u64;
+    let mut packets_rx_invalid = 0u64;
+
+    let mut pkt_buf = vec![0u8; wintun::MAX_RING_CAPACITY];
     let tcp_conns: Arc<Mutex<HashMap<ConnKey, Arc<Mutex<TcpFlow>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
@@ -168,42 +185,73 @@ pub fn run(
                 Ok(p) => p,
                 Err(e) => {
                     if running.load(Ordering::Relaxed) {
-                        eprintln!("TUN recv err: {:?}", e);
+                        eprintln!("[TUN] recv error: {:?}", e);
                     }
                     break;
                 }
             };
 
+            // Log stats every 10 seconds
+            if packets_rx > 0 && packets_rx % 1000 == 0 {
+                eprintln!("[TUN] stats: rx={}, rx_invalid={}, timezone={(std::time::SystemTime::now() - std::time::UNIX_EPOCH).as_secs() / 3600}h",
+                    packets_rx, packets_rx_invalid);
+            }
+
             let raw = pkt_buf.bytes();
             if raw.is_empty() { continue; }
 
+            packets_rx += 1;
             let pkt = match Packet::parse(raw) {
                 Some(p) => p,
-                None => continue,
+                None => {
+                    packets_rx_invalid += 1;
+                    eprintln!("[TUN] Failed to parse packet, dropping (invalid #{}) best effort dropped={}",
+                        packets_rx_invalid, packets_rx - packets_rx_invalid);
+                    continue;
+                }
             };
 
             match pkt {
                 Packet::Ipv4(ip) => {
-                    let payload = ip.payload(raw);
                     if ip.is_tcp() {
+                        let payload = ip.payload(raw);
                         if let Some(tcp) = TcpHeader::parse(payload) {
-                            eprintln!("[TUN] TCP {}:{} -> {}:{} syn={} ack={} len={}",
+                            eprintln!("[TUN] IN TCP {}:{} -> {}:{} syn={} ack={} flags={:x} len={}",
                                 ip.src, tcp.src_port, ip.dst, tcp.dst_port,
-                                tcp.is_syn(), tcp.is_ack(), payload.len() - tcp.header_len());
+                                tcp.is_syn(), tcp.is_ack(),
+                                tcp.flags() & 0xFF,
+                                payload.len() - tcp.header_len());
+                            if tcp.is_syn() {
+                                eprintln!("[TUN] TODO: handle incoming TCP SYN from kernel");
+                            }
+                        } else {
+                            eprintln!("[TUN] IN TCP {}:{} -> {}:{} (invalid header) len={}",
+                                ip.src, payload.len() - 20, ip.dst, payload.len() - 20, payload.len());
                         }
                     } else if ip.is_udp() {
+                        let payload = ip.payload(raw);
                         if let Some(udp) = UdpHeader::parse(payload) {
-                            eprintln!("[TUN] UDP {}:{} -> {}:{} len={}",
+                            eprintln!("[TUN] IN UDP {}:{} -> {}:{} len={}",
                                 ip.src, udp.src_port, ip.dst, udp.dst_port,
                                 payload.len() - 8);
+                            if payload.len() - 8 > 0 {
+                                eprintln!("[TUN] TODO: forward UDP to SOCKS5");
+                            }
+                        } else {
+                            eprintln!("[TUN] IN UDP {}:{} -> {}:{} (invalid header) len={}",
+                                ip.src, payload.len() - 20, ip.dst, payload.len() - 20, payload.len());
                         }
+                    } else {
+                        eprintln!("[TUN] IN other IP protocol {} src={}", ip.protocol, ip.src);
                     }
                     handle_ipv4(
                         ip, raw, &tcp_conns, &tun_writer,
                         &socks5_addr, socks5_port, &running,
-                    ).await
+                    ).await;
                 }
-                Packet::Ipv6(_) => { /* drop */ }
+                Packet::Ipv6(_) => {
+                    eprintln!("[TUN] IN IPv6, dropping (not implemented yet)");
+                }
             }
         }
         Ok::<(), anyhow::Error>(())
