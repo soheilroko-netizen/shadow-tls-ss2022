@@ -187,33 +187,10 @@ fn set_adapter_address(adapter: &Arc<wintun::Adapter>, ip: &str, prefix_len: u8)
 fn packet_worker(
     session: Arc<Session>,
     running: Arc<AtomicBool>,
-    _socks5_addr: String,
-    _socks5_port: u16,
+    socks5_addr: String,
+    socks5_port: u16,
 ) -> Result<()> {
-    while running.load(Ordering::Relaxed) {
-        // Read packet from TUN
-        let pkt = match session.receive_blocking() {
-            Ok(pkt) => pkt,
-            Err(e) => {
-                if running.load(Ordering::Relaxed) {
-                    eprintln!("TUN receive error: {:?}", e);
-                }
-                break;
-            }
-        };
-
-        let _bytes = pkt.bytes();
-        
-        // TODO: Parse IP packet and forward via SOCKS5
-        // For now, just drop packets (placeholder)
-        // Real implementation needs:
-        // 1. Parse IP header (get dst IP/port/protocol)
-        // 2. Connect to SOCKS5 proxy
-        // 3. Forward packet payload
-        // 4. Route response back to TUN
-    }
-    
-    Ok(())
+    crate::forwarder::run(session, running, socks5_addr, socks5_port)
 }
 
 #[cfg(not(target_os = "windows"))]

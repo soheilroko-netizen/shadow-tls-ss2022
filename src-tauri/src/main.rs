@@ -7,6 +7,9 @@ use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 mod config;
 mod proxy;
 mod tun;
+mod packet;
+mod socks5;
+mod forwarder;
 
 use config::Config;
 use config::ProfileStore;
