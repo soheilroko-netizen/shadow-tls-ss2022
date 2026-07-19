@@ -64,7 +64,7 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build Tauri app (MSI + NSIS, with bundled sing-box.exe)
+      - name: Build Tauri app (MSI + NSIS, with bundled wintun.dll)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
