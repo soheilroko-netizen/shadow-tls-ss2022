@@ -263,3 +263,26 @@ h1 {
 .profile-bar button:hover {
   background: var(--border);
 }
+
+/* VPN section */
+.vpn-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.vpn-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.btn-vpn {
+  background: #6b2fa0;
+  color: #fff;
+}
+
+.btn-vpn:hover:not(:disabled) {
+  background: #7d3bb8;
+}

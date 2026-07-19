@@ -88,6 +88,52 @@ async function stopProxy() {
   }
 }
 
+// VPN (TUN) functions
+async function updateVpnStatus() {
+  try {
+    const isRunning = await invoke<boolean>('get_tun_status');
+    const btnOn = document.getElementById('btn-vpn-on') as HTMLButtonElement;
+    const btnOff = document.getElementById('btn-vpn-off') as HTMLButtonElement;
+    if (isRunning) {
+      btnOn.disabled = true;
+      btnOff.disabled = false;
+    } else {
+      btnOn.disabled = false;
+      btnOff.disabled = true;
+    }
+  } catch { /* TUN not available — ignore */ }
+}
+
+async function startVpn() {
+  try {
+    const msg = await invoke<string>('start_tun');
+    showVpnMessage(msg, 'success');
+    await updateVpnStatus();
+  } catch (err) {
+    showVpnMessage('VPN failed: ' + err, 'error');
+  }
+}
+
+async function stopVpn() {
+  try {
+    const msg = await invoke<string>('stop_tun');
+    showVpnMessage(msg, 'success');
+    await updateVpnStatus();
+  } catch (err) {
+    showVpnMessage('VPN stop failed: ' + err, 'error');
+  }
+}
+
+function showVpnMessage(text: string, type: 'success' | 'error') {
+  const msgEl = document.getElementById('vpn-message')!;
+  msgEl.textContent = text;
+  msgEl.className = `message ${type}`;
+  setTimeout(() => {
+    msgEl.textContent = '';
+    msgEl.className = 'message';
+  }, 5000);
+}
+
 function showMessage(text: string, type: 'success' | 'error') {
   const msgEl = document.getElementById('message')!;
   msgEl.textContent = text;
@@ -234,6 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('profile-select')?.addEventListener('change', switchProfile);
   document.getElementById('btn-new-profile')?.addEventListener('click', newProfile);
   document.getElementById('btn-delete-profile')?.addEventListener('click', deleteProfile);
+  // VPN buttons
+  document.getElementById('btn-vpn-on')?.addEventListener('click', startVpn);
+  document.getElementById('btn-vpn-off')?.addEventListener('click', stopVpn);
   updateStatus();
+  updateVpnStatus();
   setInterval(updateStatus, 2000);
+  setInterval(updateVpnStatus, 2000);
 });
