@@ -6,13 +6,16 @@ use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 mod config;
 mod proxy;
+mod tun;
 
 use config::Config;
 use config::ProfileStore;
 use proxy::ProxyManager;
+use tun::{TunConfig, TunManager};
 
 struct AppState {
     proxy: Mutex<ProxyManager>,
+    tun: Mutex<TunManager>,
 }
 
 #[tauri::command]
@@ -70,6 +73,24 @@ fn switch_profile(name: String) -> Result<String, String> {
     Ok(format!("Switched to profile '{}'", name))
 }
 
+#[tauri::command]
+fn get_tun_status(state: State<AppState>) -> Result<bool, String> {
+    let tun = state.tun.lock().unwrap();
+    Ok(tun.is_running())
+}
+
+#[tauri::command]
+fn start_tun(state: State<AppState>) -> Result<String, String> {
+    let mut tun = state.tun.lock().unwrap();
+    tun.start().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn stop_tun(state: State<AppState>) -> Result<String, String> {
+    let mut tun = state.tun.lock().unwrap();
+    tun.stop().map_err(|e| e.to_string())
+}
+
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("stls v2")
@@ -81,12 +102,14 @@ fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::
 
 fn main() {
     let proxy_manager = ProxyManager::new().expect("Failed to init proxy manager");
+    let tun_manager = TunManager::new(TunConfig::default());
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             proxy: Mutex::new(proxy_manager),
+            tun: Mutex::new(tun_manager),
         })
         .setup(|app| {
             create_main_window(&app.handle())?;
@@ -102,6 +125,9 @@ fn main() {
             add_profile,
             delete_profile,
             switch_profile,
+            get_tun_status,
+            start_tun,
+            stop_tun,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
