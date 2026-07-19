@@ -70,18 +70,53 @@ impl TunManager {
             bail!("TUN already running");
         }
 
-        // Load wintun.dll from the same directory as the executable
-        let exe_dir = std::env::current_exe()
-            .context("Failed to get current exe path")?
-            .parent()
-            .context("Failed to get exe directory")?
-            .to_path_buf();
-        
-        let wintun_path = exe_dir.join("wintun.dll");
+        // Load wintun.dll — search common Tauri resource locations
+        let wintun_path = {
+            let mut candidates: Vec<std::path::PathBuf> = vec![];
+            // exe directory (dev mode + some install layouts)
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(dir) = exe.parent() {
+                    candidates.push(dir.join("wintun.dll"));
+                    candidates.push(dir.join("bin").join("wintun.dll"));
+                }
+            }
+            // Tauri resource dir for different install types
+            if let Ok(local) = std::env::var("LOCALAPPDATA") {
+                let base = std::path::PathBuf::from(local).join("stls");
+                candidates.push(base.join("wintun.dll"));
+                candidates.push(base.join("bin").join("wintun.dll"));
+                let base2 = std::path::PathBuf::from(local).join("com.stls.app");
+                candidates.push(base2.join("wintun.dll"));
+                candidates.push(base2.join("bin").join("wintun.dll"));
+            }
+            if let Ok(roaming) = std::env::var("APPDATA") {
+                let base = std::path::PathBuf::from(roaming).join("stls");
+                candidates.push(base.join("wintun.dll"));
+                candidates.push(base.join("bin").join("wintun.dll"));
+                let base2 = std::path::PathBuf::from(roaming).join("com.stls.app");
+                candidates.push(base2.join("wintun.dll"));
+                candidates.push(base2.join("bin").join("wintun.dll"));
+            }
+            // Program Files (MSI install)
+            if let Ok(pf) = std::env::var("ProgramFiles") {
+                let base = std::path::PathBuf::from(pf).join("stls");
+                candidates.push(base.join("wintun.dll"));
+                candidates.push(base.join("bin").join("wintun.dll"));
+            }
+            candidates
+                .into_iter()
+                .find(|p| p.exists())
+                .unwrap_or_else(|| {
+                    std::env::current_exe()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join("wintun.dll")
+                })
+        };
         if !wintun_path.exists() {
             bail!(
-                "wintun.dll not found at {}. Download from https://www.wintun.net/",
-                wintun_path.display()
+                "wintun.dll not found. Place wintun.dll next to stls.exe or in %APPDATA%\\stls\\. Download from https://www.wintun.net/"
             );
         }
 
