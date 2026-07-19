@@ -12,7 +12,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
-    "resources": ["bin/wintun.dll"],
+    "resources": ["bin/wintun.dll", "bin/sing-box.exe"],
     "icon": [
       "icons/icon.png",
       "icons/icon.ico"
