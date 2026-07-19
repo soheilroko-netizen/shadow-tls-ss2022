@@ -1,10 +1,10 @@
-name: Build stls v3 (TUN VPN + bundled sing-box)
+name: Build stls (WinTun TUN VPN)
 
 on:
   push:
-    branches: [v3]
+    branches: [v3, v4]
   pull_request:
-    branches: [v3]
+    branches: [v3, v4]
   workflow_dispatch:
 
 jobs:
