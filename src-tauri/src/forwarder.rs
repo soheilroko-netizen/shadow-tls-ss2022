@@ -150,10 +150,13 @@ async fn packet_worker(
     let mut packets_rx = 0u64;
     let mut packets_rx_invalid = 0u64;
 
-    let mut pkt_buf = vec![0u8; wintun::MAX_RING_CAPACITY];
+    let mut pkt_buf = vec![0u8; wintun::MAX_RING_CAPACITY as usize];
     let tcp_conns: Arc<Mutex<HashMap<ConnKey, Arc<Mutex<TcpFlow>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
+    let tun_writer = Arc::new(TunWriter::new(session.clone()));
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async move {
         // TCP idle-sweep task (close stale connections)
         let tcp_conns_sweep = tcp_conns.clone();
