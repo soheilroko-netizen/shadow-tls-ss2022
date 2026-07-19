@@ -16,49 +16,23 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------------------------------------------------------------
-      # 1. Download sing-box and place it at src-tauri/bin/sing-box.exe
-      #    so Tauri bundles it inside the MSI / NSIS installer via the
-      #    `resources` field in tauri.conf.json. This eliminates the
-      #    auto-download on first launch: sing-box.exe already lives
-      #    beside stls.exe after the user installs.
+      # 1. Download wintun.dll for TUN device support
       # ---------------------------------------------------------------
-      - name: Download sing-box (Windows x86_64)
+      - name: Download wintun.dll
         shell: pwsh
         run: |
-          # Pinned to 1.10.7 — the last release before the inbound legacy
-          # field / DNS server / domain_resolver deprecation waves that
-          # broke our config six builds in a row. Migrating to 1.13.x
-          # config schema is a separate effort; for now ship a known-good
-          # version whose schema matches what proxy.rs generates.
-          $tag = "1.10.7"
-          $version = $tag
-          $assetName = "sing-box-$version-windows-amd64.zip"
-          $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/SagerNet/sing-box/releases/tags/$tag" `
-            -Headers @{ "User-Agent" = "stls"; "Authorization" = "Bearer ${{ secrets.GITHUB_TOKEN }}" }
-          $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
-          if (-not $asset) {
-            throw "Asset $assetName not found in release $tag"
+          Invoke-WebRequest -Uri "https://www.wintun.net/builds/wintun-0.14.1.zip" -OutFile "wintun.zip"
+          Expand-Archive -Path "wintun.zip" -DestinationPath "wintun-staged" -Force
+          Remove-Item "wintun.zip" -Force
+          # Move wintun.dll to src-tauri/bin/ so Tauri bundles it
+          New-Item -ItemType Directory -Force -Path "src-tauri\\bin" | Out-Null
+          Move-Item "wintun-staged\\wintun\\bin\\amd64\\wintun.dll" "src-tauri\\bin\\wintun.dll" -Force
+          Remove-Item -Recurse -Force "wintun-staged"
+          Write-Host "wintun.dll ready at src-tauri\\bin\\wintun.dll"
+          if (-not (Test-Path "src-tauri\\bin\\wintun.dll")) {
+            throw "wintun.dll missing after move"
           }
-          Write-Host "Downloading $($asset.name) from $($asset.browser_download_url)"
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "sing-box.zip"
-
-          # Extract and move sing-box.exe into src-tauri/bin/
-          New-Item -ItemType Directory -Force -Path "src-tauri\bin" | Out-Null
-          Expand-Archive -Path "sing-box.zip" -DestinationPath "staged" -Force
-          Remove-Item "sing-box.zip" -Force
-          $exe = Get-ChildItem -Path "staged" -Filter "sing-box.exe" -Recurse | Select-Object -First 1
-          if (-not $exe) {
-            throw "sing-box.exe not found in extracted zip"
-          }
-          Move-Item $exe.FullName "src-tauri\bin\sing-box.exe" -Force
-          Remove-Item -Recurse -Force "staged"
-          Write-Host "sing-box.exe ready at src-tauri\bin\sing-box.exe"
-          # Sanity check
-          if (-not (Test-Path "src-tauri\bin\sing-box.exe")) {
-            throw "sing-box.exe missing after move"
-          }
-          Get-Item "src-tauri\bin\sing-box.exe" | Select-Object Name, Length, FullName
+          Get-Item "src-tauri\\bin\\wintun.dll" | Select-Object Name, Length, FullName
 
       # ---------------------------------------------------------------
       # 2. Frontend (pnpm + Vite)
