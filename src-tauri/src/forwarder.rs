@@ -149,9 +149,12 @@ pub fn run(
                 if !running_sweep.load(Ordering::Relaxed) { break; }
                 let mut g = tcp_conns_sweep.lock().await;
                 let stale: Vec<_> = g.iter()
-                    .filter(|(_, f)| f.lock().await.closing ||
-                        f.lock().await.last_active.elapsed() > Duration::from_secs(300))
-                    .map(|(k, _)| k.clone())
+                    .map(|(k, f)| {
+                        let f_guard = futures::executor::block_on(f.lock());
+                        (k.clone(), f_guard.closing || f_guard.last_active.elapsed() > Duration::from_secs(300))
+                    })
+                    .filter(|(_, is_stale)| *is_stale)
+                    .map(|(k, _)| k)
                     .collect();
                 for k in stale { g.remove(&k); }
             }
