@@ -340,9 +340,14 @@ async fn handle_tcp_syn(
     let dst_port = tcp.dst_port;
     let socks_addr = socks5_addr.to_string();
 
-    // Attempt SOCKS5 connect
-    match Socks5Stream::connect(&socks_addr, socks5_port, &dst_ip, dst_port) {
-        Ok(sock5) => {
+    // Attempt SOCKS5 connect (use spawn_blocking since socks5.rs uses std::net)
+    let socks_addr2 = socks_addr.clone();
+    let dst_ip2 = dst_ip.clone();
+    let sock5 = tokio::task::spawn_blocking(move || {
+        Socks5Stream::connect(&socks_addr2, socks5_port, &dst_ip2, dst_port)
+    }).await;
+    match sock5 {
+        Ok(Ok(sock5)) => {
             // Convert to tokio TcpStream via std conversion
             let std_stream: std::net::TcpStream = sock5.into();
             std_stream.set_nonblocking(true).ok();
@@ -376,7 +381,7 @@ async fn handle_tcp_syn(
                 Err(e) => eprintln!("tokio from_std err: {}", e),
             }
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             eprintln!("socks5 connect to {}:{} failed: {}", dst_ip, dst_port, e);
             // Send RST back so the app sees refused
             let rst = build_tcp_packet(
@@ -384,6 +389,9 @@ async fn handle_tcp_syn(
                 0, tcp.seq + 1, TCP_RST | TCP_ACK, 0, &[],
             );
             tun_writer.write(rst);
+        }
+        Err(e) => {
+            eprintln!("socks5 spawn_blocking error: {}", e);
         }
     }
 }
