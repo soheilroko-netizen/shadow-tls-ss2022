@@ -144,8 +144,11 @@ impl TunManager {
         set_adapter_address(&adapter, ip, mask)?;
 
         // Add route: send all traffic through TUN (0.0.0.0/0 -> stls0 gateway)
+        // Use 'route add 0.0.0.0 mask 0.0.0.0 <gateway> metric 1 if <interface_index>'
+        let if_index = adapter.get_adapter_index()
+            .context("Failed to get adapter index")?;
         let route_output = Command::new("route")
-            .args(["add", "0.0.0.0", "mask", "0.0.0.0", ip, "metric", "1"])
+            .args(["add", "0.0.0.0", "mask", "0.0.0.0", ip, "metric", "1", "if", &if_index.to_string()])
             .output()
             .context("Failed to run route command")?;
         
