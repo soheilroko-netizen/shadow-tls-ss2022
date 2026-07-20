@@ -105,7 +105,11 @@ fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::
 
 fn main() {
     let proxy_manager = ProxyManager::new().expect("Failed to init proxy manager");
-    let tun_manager = TunManager::new(TunConfig::default());
+    let mut tun_config = TunConfig::default();
+    if let Ok(cfg) = Config::load() {
+        tun_config.server_address = cfg.server_address.clone();
+    }
+    let tun_manager = TunManager::new(tun_config);
     
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

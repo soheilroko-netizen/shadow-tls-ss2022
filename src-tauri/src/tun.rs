@@ -22,6 +22,8 @@ pub struct TunConfig {
     pub socks5_addr: String,
     /// SOCKS5 proxy port (e.g., 1080)
     pub socks5_port: u16,
+    /// Proxy server address (for bypass route to prevent TUN loop)
+    pub server_address: String,
 }
 
 impl Default for TunConfig {
@@ -31,6 +33,7 @@ impl Default for TunConfig {
             address: "10.0.0.1/24".into(),
             socks5_addr: "127.0.0.1".into(),
             socks5_port: 1080,
+            server_address: String::new(),
         }
     }
 }
