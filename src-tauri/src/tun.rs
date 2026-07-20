@@ -156,6 +156,42 @@ impl TunManager {
             eprintln!("Route add failed: {}", String::from_utf8_lossy(&route_output.stderr));
         }
 
+        // Add exclusion route for proxy server so its traffic bypasses TUN
+        // Otherwise sing-box outbound -> TUN -> sing-box = infinite loop
+        let server_addr = &self.config.server_address;
+        let resolved = std::net::ToSocketAddrs::to_socket_addrs(
+            &format!("{}:443", server_addr).as_str()
+        ).ok().and_then(|mut a| a.next()).map(|s| s.ip());
+
+        // Detect default gateway from existing route table
+        let route_print = Command::new("route")
+            .args(["print", "0.0.0.0"])
+            .output()
+            .context("Failed to get route table")?;
+        let route_text = String::from_utf8_lossy(&route_print.stdout);
+        let default_gw = route_text.lines()
+            .find_map(|l| {
+                let parts: Vec<&str> = l.split_whitespace().collect();
+                if parts.len() >= 3 && parts[0] == "0.0.0.0" && parts[1] == "0.0.0.0" && parts[2] != "On-link" {
+                    Some(parts[2].to_string())
+                } else { None }
+            })
+            .unwrap_or_else(|| "192.168.1.1".to_string());
+        eprintln!("[TUN] Default gateway detected: {}", default_gw);
+
+        if let Some(server_ip) = resolved {
+            eprintln!("[TUN] Server {} resolved to {}, adding bypass route via {}", server_addr, server_ip, default_gw);
+            let bypass = Command::new("route")
+                .args(["add", &server_ip.to_string(), "mask", "255.255.255.255", &default_gw, "metric", "1"])
+                .output()
+                .context("Failed to run bypass route command")?;
+            if !bypass.status.success() {
+                eprintln!("[TUN] Bypass route failed: {}", String::from_utf8_lossy(&bypass.stderr));
+            }
+        } else {
+            eprintln!("[TUN] WARNING: Could not resolve server {} for bypass route", server_addr);
+        }
+
         // Start the session
         let session = adapter.start_session(wintun::MAX_RING_CAPACITY)
             .context("Failed to start TUN session")?;
