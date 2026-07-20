@@ -156,44 +156,44 @@ async fn packet_worker(
 
     let tun_writer = Arc::new(TunWriter::new(session.clone()));
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async move {
-        // TCP idle-sweep task (close stale connections)
-        let tcp_conns_sweep = tcp_conns.clone();
-        let running_sweep = running.clone();
-        tokio::spawn(async move {
+    // TCP idle-sweep task (close stale connections)
+    let tcp_conns_sweep = tcp_conns.clone();
+    let running_sweep = running.clone();
+    tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             loop {
                 interval.tick().await;
                 if !running_sweep.load(Ordering::Relaxed) { break; }
                 let mut g = tcp_conns_sweep.lock().await;
                 let stale: Vec<_> = g.iter()
-                    .map(|(k, f)| {
-                        let f_guard = futures::executor::block_on(f.lock());
-                        (k.clone(), f_guard.closing || f_guard.last_active.elapsed() > Duration::from_secs(300))
+                    .filter_map(|(k, f)| {
+                        let f_guard = f.try_lock();
+                        if let Ok(guard) = f_guard {
+                            if guard.closing || guard.last_active.elapsed() > Duration::from_secs(300) {
+                                Some(k.clone())
+                            } else { None }
+                        } else { None }
                     })
-                    .filter(|(_, is_stale)| *is_stale)
-                    .map(|(k, _)| k)
                     .collect();
                 for k in stale { g.remove(&k); }
             }
         });
 
-        // Main packet loop
-        loop {
-            if !running.load(Ordering::Relaxed) { break; }
+    // Main packet loop
+    loop {
+        if !running.load(Ordering::Relaxed) { break; }
 
-            let pkt_buf = match session.receive_blocking() {
-                Ok(p) => p,
-                Err(e) => {
-                    if running.load(Ordering::Relaxed) {
-                        eprintln!("[TUN] recv error: {:?}", e);
-                    }
-                    break;
+        let pkt_buf = match session.receive_blocking() {
+            Ok(p) => p,
+            Err(e) => {
+                if running.load(Ordering::Relaxed) {
+                    eprintln!("[TUN] recv error: {:?}", e);
                 }
-            };
+                break;
+            }
+        };
 
-            // Log stats every 1000 packets
+        // Log stats every 1000 packets
             if packets_rx > 0 && packets_rx % 1000 == 0 {
                 let grpc = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -265,9 +265,8 @@ async fn packet_worker(
                     eprintln!("[TUN] IN IPv6, dropping (not implemented yet)");
                 }
             }
-        }
-        Ok::<(), anyhow::Error>(())
-    })
+    }
+    Ok::<(), anyhow::Error>(())
 }
 
 #[cfg(target_os = "windows")]
