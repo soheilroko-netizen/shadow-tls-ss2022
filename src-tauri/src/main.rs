@@ -2,6 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Mutex;
+use std::time::Instant;
+
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 mod config;
@@ -19,6 +23,7 @@ use tun::{TunConfig, TunManager};
 struct AppState {
     proxy: Mutex<ProxyManager>,
     tun: Mutex<TunManager>,
+    started_at: Mutex<Option<Instant>>,
 }
 
 #[tauri::command]
@@ -30,13 +35,17 @@ fn get_status(state: State<AppState>) -> Result<bool, String> {
 #[tauri::command]
 fn start_proxy(state: State<AppState>) -> Result<String, String> {
     let mut proxy = state.proxy.lock().unwrap();
-    proxy.start().map_err(|e| e.to_string())
+    let result = proxy.start().map_err(|e| e.to_string())?;
+    *state.started_at.lock().unwrap() = Some(Instant::now());
+    Ok(result)
 }
 
 #[tauri::command]
 fn stop_proxy(state: State<AppState>) -> Result<String, String> {
     let mut proxy = state.proxy.lock().unwrap();
-    proxy.stop().map_err(|e| e.to_string())
+    let result = proxy.stop().map_err(|e| e.to_string())?;
+    *state.started_at.lock().unwrap() = None;
+    Ok(result)
 }
 
 #[tauri::command]
@@ -94,9 +103,51 @@ fn stop_tun(state: State<AppState>) -> Result<String, String> {
     tun.stop().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_traffic() -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| format!("client: {}", e))?;
+
+    let resp = client
+        .get("http://127.0.0.1:9097/connections?token=dakal")
+        .send()
+        .map_err(|e| format!("req: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("bad status: {}", resp.status()));
+    }
+
+    let body: serde_json::Value = resp.json().map_err(|e| format!("parse: {}", e))?;
+    let up = body["uploadTotal"].as_u64().unwrap_or(0);
+    let down = body["downloadTotal"].as_u64().unwrap_or(0);
+    Ok(format!(r#"{{"up":{},"down":{}}}"#, up, down))
+}
+
+#[tauri::command]
+fn get_active_profile_name() -> Result<String, String> {
+    let store = ProfileStore::load().map_err(|e| e.to_string())?;
+    Ok(store.active_profile)
+}
+
+/// Update tray tooltip with profile name + connection status
+fn update_tray(app: &tauri::AppHandle, connected: bool) {
+    let store = ProfileStore::load().ok();
+    let profile = store.as_ref().map(|s| s.active_profile.as_str()).unwrap_or("Default");
+    let tip = if connected {
+        format!("dakal-tls VPN - {} (Connected)", profile)
+    } else {
+        format!("dakal-tls VPN ({})", profile)
+    };
+    if let Some(tray) = app.tray_icon_by_id("main") {
+        tray.set_tooltip(&tip).ok();
+    }
+}
+
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("stls v2")
+        .title("dakal-tls v5")
         .inner_size(500.0, 400.0)
         .resizable(true)
         .build()?;
@@ -110,17 +161,108 @@ fn main() {
         tun_config.server_address = cfg.server_address.clone();
     }
     let tun_manager = TunManager::new(tun_config);
-    
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             proxy: Mutex::new(proxy_manager),
             tun: Mutex::new(tun_manager),
+            started_at: Mutex::new(None),
         })
         .setup(|app| {
+            let connect_item = MenuItemBuilder::with_id("toggle", "Connect").build(app)?;
+            let profile_item = MenuItemBuilder::with_id("profile", "Profile: Default").enabled(false).build(app)?;
+            let show_item = MenuItemBuilder::with_id("show", "Show").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+
+            let menu = MenuBuilder::new(app)
+                .item(&profile_item)
+                .separator()
+                .item(&connect_item)
+                .separator()
+                .item(&show_item)
+                .item(&quit_item)
+                .build()?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("dakal-tls VPN")
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id().as_ref() {
+                        "toggle" => {
+                            let state: State<AppState> = app.state();
+                            let mut proxy = state.proxy.lock().unwrap();
+                            if proxy.is_running() {
+                                proxy.stop().ok();
+                                *state.started_at.lock().unwrap() = None;
+                                app.tray_icon_by_id("main").unwrap().set_menuitem_text("toggle", "Connect").ok();
+                            } else {
+                                proxy.start().ok();
+                                *state.started_at.lock().unwrap() = Some(Instant::now());
+                                app.tray_icon_by_id("main").unwrap().set_menuitem_text("toggle", "Disconnect").ok();
+                            }
+                            drop(proxy);
+                            // Update tray tooltip
+                            let store = ProfileStore::load().ok();
+                            let profile = store.as_ref().map(|s| s.active_profile.as_str()).unwrap_or("Default");
+                            let state2: State<AppState> = app.state();
+                            let connected = state2.proxy.lock().unwrap().is_running();
+                            let tip = if connected {
+                                format!("dakal-tls VPN - {} (Connected)", profile)
+                            } else {
+                                format!("dakal-tls VPN ({})", profile)
+                            };
+                            if let Some(tray) = app.tray_icon_by_id("main") {
+                                tray.set_tooltip(&tip).ok();
+                            }
+                        }
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                window.show().ok();
+                                window.set_focus().ok();
+                            }
+                        }
+                        "quit" => {
+                            // Stop proxy first
+                            let state: State<AppState> = app.state();
+                            state.proxy.lock().unwrap().stop().ok();
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().ok().unwrap_or(false) {
+                                window.hide().ok();
+                            } else {
+                                window.show().ok();
+                                window.set_focus().ok();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+
             create_main_window(&app.handle())?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    window.hide().ok();
+                    api.prevent_close();
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
@@ -135,6 +277,8 @@ fn main() {
             get_tun_status,
             start_tun,
             stop_tun,
+            get_traffic,
+            get_active_profile_name,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");

@@ -134,6 +134,26 @@ function showVpnMessage(text: string, type: 'success' | 'error') {
   }, 5000);
 }
 
+async function updateTraffic() {
+  try {
+    const raw = await invoke<string>('get_traffic');
+    const data = JSON.parse(raw);
+    const up = formatBytes(data.up || 0);
+    const down = formatBytes(data.down || 0);
+    document.getElementById('traffic-text')!.textContent = `↑${up} ↓${down}`;
+  } catch {
+    // Not connected or no Clash API
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1);
+  const val = bytes / Math.pow(1000, i);
+  return val.toFixed(i > 0 ? 1 : 0) + units[i];
+}
+
 function showMessage(text: string, type: 'success' | 'error') {
   const msgEl = document.getElementById('message')!;
   msgEl.textContent = text;
@@ -285,6 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-vpn-off')?.addEventListener('click', stopVpn);
   updateStatus();
   updateVpnStatus();
+  updateTraffic();
   setInterval(updateStatus, 2000);
   setInterval(updateVpnStatus, 2000);
+  setInterval(updateTraffic, 3000);
 });

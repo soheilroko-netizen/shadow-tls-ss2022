@@ -45,6 +45,21 @@ struct SbConfig {
     log: SbLog,
     inbounds: Vec<SbInbound>,
     outbounds: Vec<SbOutbound>,
+    experimental: SbExperimental,
+}
+
+#[derive(Serialize)]
+struct SbExperimental {
+    clash_api: SbClashApi,
+}
+
+#[derive(Serialize)]
+struct SbClashApi {
+    external_controller: String,
+    secret: String,
+    external_ui: String,
+    external_ui_download_url: String,
+    external_ui_download_detour: String,
 }
 
 #[derive(Serialize)]
@@ -238,6 +253,15 @@ impl ProxyManager {
                     detour: None,
                 },
             ],
+            experimental: SbExperimental {
+                clash_api: SbClashApi {
+                    external_controller: "127.0.0.1:9097".into(),
+                    secret: "dakal".into(),
+                    external_ui: "ui".into(),
+                    external_ui_download_url: "".into(),
+                    external_ui_download_detour: "direct".into(),
+                },
+            },
         }
     }
 
