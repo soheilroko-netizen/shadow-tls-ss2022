@@ -105,23 +105,60 @@ fn stop_tun(state: State<AppState>) -> Result<String, String> {
 
 #[tauri::command]
 fn get_traffic() -> Result<String, String> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-        .map_err(|e| format!("client: {}", e))?;
+    use std::io::Read;
+    use std::net::TcpStream;
+    use std::time::{Duration, Instant};
 
-    let resp = client
-        .get("http://127.0.0.1:9097/connections?token=dakal")
-        .send()
-        .map_err(|e| format!("req: {}", e))?;
+    let mut stream = TcpStream::connect_timeout(
+        &"127.0.0.1:9097".parse().map_err(|e| format!("addr: {e}"))?,
+        Duration::from_secs(2),
+    )
+    .map_err(|e| format!("connect: {e}"))?;
 
-    if !resp.status().is_success() {
-        return Err(format!("bad status: {}", resp.status()));
+    stream
+        .set_read_timeout(Some(Duration::from_millis(800)))
+        .map_err(|e| format!("set_read_timeout: {e}"))?;
+
+    let req = "GET /traffic HTTP/1.1\r\nHost: 127.0.0.1:9097\r\nAuthorization: Bearer dakal\r\n\r\n";
+    use std::io::Write;
+    stream
+        .write_all(req.as_bytes())
+        .map_err(|e| format!("write: {e}"))?;
+
+    // Read stream for up to 1.5s, collect last valid JSON line
+    let deadline = Instant::now() + Duration::from_millis(1500);
+    let mut all_data = String::new();
+    let mut buf = [0u8; 2048];
+
+    while Instant::now() < deadline {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                all_data.push_str(&String::from_utf8_lossy(&buf[..n]));
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
+                || e.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
+            Err(e) => return Err(format!("read: {e}")),
+        }
     }
 
-    let body: serde_json::Value = resp.json().map_err(|e| format!("parse: {}", e))?;
-    let up = body["uploadTotal"].as_u64().unwrap_or(0);
-    let down = body["downloadTotal"].as_u64().unwrap_or(0);
+    // Find last line that looks like {"up":N,"down":N}
+    let mut last_json: Option<(u64, u64)> = None;
+    for line in all_data.lines() {
+        let line = line.trim();
+        if line.starts_with('{') && line.contains("\"up\"") {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
+                let up = v["up"].as_u64().unwrap_or(0);
+                let down = v["down"].as_u64().unwrap_or(0);
+                last_json = Some((up, down));
+            }
+        }
+    }
+
+    let (up, down) = last_json.unwrap_or((0, 0));
     Ok(format!(r#"{{"up":{},"down":{}}}"#, up, down))
 }
 
