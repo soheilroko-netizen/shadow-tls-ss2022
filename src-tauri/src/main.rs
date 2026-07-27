@@ -177,7 +177,7 @@ fn update_tray(app: &tauri::AppHandle, connected: bool) {
     } else {
         format!("dakal-tls VPN ({})", profile)
     };
-    if let Some(tray) = app.tray_icon_by_id("main") {
+    if let Some(tray) = app.tray_by_id("main") {
         tray.set_tooltip(&tip).ok();
     }
 }
@@ -234,11 +234,11 @@ fn main() {
                             if proxy.is_running() {
                                 proxy.stop().ok();
                                 *state.started_at.lock().unwrap() = None;
-                                app.tray_icon_by_id("main").unwrap().set_menuitem_text("toggle", "Connect").ok();
+                                app.tray_by_id("main").unwrap().set_menuitem_text("toggle", "Connect").ok();
                             } else {
                                 proxy.start().ok();
                                 *state.started_at.lock().unwrap() = Some(Instant::now());
-                                app.tray_icon_by_id("main").unwrap().set_menuitem_text("toggle", "Disconnect").ok();
+                                app.tray_by_id("main").unwrap().set_menuitem_text("toggle", "Disconnect").ok();
                             }
                             drop(proxy);
                             // Update tray tooltip
@@ -251,7 +251,7 @@ fn main() {
                             } else {
                                 format!("dakal-tls VPN ({})", profile)
                             };
-                            if let Some(tray) = app.tray_icon_by_id("main") {
+                            if let Some(tray) = app.tray_by_id("main") {
                                 tray.set_tooltip(&tip).ok();
                             }
                         }

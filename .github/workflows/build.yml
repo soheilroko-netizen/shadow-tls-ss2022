@@ -89,12 +89,13 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build Tauri app (MSI + NSIS, with bundled wintun.dll)
+      - name: Build Tauri app (NSIS installer, bundled wintun.dll)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: pnpm tauri
+          args: --bundles nsis
 
       # ---------------------------------------------------------------
       # 4. Upload installer artifacts
