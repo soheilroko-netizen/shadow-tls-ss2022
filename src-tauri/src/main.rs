@@ -226,7 +226,9 @@ fn main() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("dakal-tls VPN")
                 .menu(&menu)
-                .on_menu_event(|app, event| {
+                .on_menu_event({
+                    let connect_item = connect_item.clone();
+                    move |app, event| {
                     match event.id().as_ref() {
                         "toggle" => {
                             let state: State<AppState> = app.state();
@@ -234,11 +236,11 @@ fn main() {
                             if proxy.is_running() {
                                 proxy.stop().ok();
                                 *state.started_at.lock().unwrap() = None;
-                                app.tray_by_id("main").unwrap().set_menuitem_text("toggle", "Connect").ok();
+                                connect_item.set_text("Connect").ok();
                             } else {
                                 proxy.start().ok();
                                 *state.started_at.lock().unwrap() = Some(Instant::now());
-                                app.tray_by_id("main").unwrap().set_menuitem_text("toggle", "Disconnect").ok();
+                                connect_item.set_text("Disconnect").ok();
                             }
                             drop(proxy);
                             // Update tray tooltip
