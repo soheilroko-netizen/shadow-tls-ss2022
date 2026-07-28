@@ -272,11 +272,13 @@ html, body {
 /* Power ring - sits on Saturn in bg image */
 .power-ring {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 220px;
+  height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: -35px;
+  margin-top: 80px;
 }
 
 .ring-outer {
@@ -297,10 +299,10 @@ html, body {
 .power-ring::before {
   content: '';
   position: absolute;
-  width: 64px;
-  height: 64px;
+  width: 86px;
+  height: 86px;
   border-radius: 50%;
-  border: 2.5px solid rgba(255,255,255,0.25);
+  border: 3px solid rgba(255,255,255,0.25);
   pointer-events: none;
   transition: all 0.3s;
 }
@@ -312,8 +314,8 @@ html, body {
 .power-btn {
   position: absolute;
   z-index: 3;
-  width: 50px;
-  height: 50px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   border: none;
   background: rgba(0,0,0,0.45);
@@ -421,16 +423,18 @@ html, body {
 /* ── Bottom Bar ─────────────────────────────────────────────── */
 .bottom-bar {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 42px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   background: rgba(8, 12, 25, 0.08);
   backdrop-filter: blur(8px);
-  border-top: 1px solid var(--glass-border);
-  padding: 8px 16px;
-  gap: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  gap: 14px;
+  min-width: 70%;
 }
 
 .stat-item {
@@ -444,6 +448,8 @@ html, body {
   color: var(--text-dim);
   flex-shrink: 0;
   opacity: 0.5;
+  width: 16px;
+  height: 16px;
 }
 
 .stat-labels {
@@ -453,14 +459,14 @@ html, body {
 }
 
 .stat-title {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--text-dim);
   letter-spacing: 1px;
 }
 
 .stat-value {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
@@ -493,6 +499,10 @@ html, body {
 .connected .b1, .connected .b2, .connected .b3,
 .connected .b4, .connected .b5 {
   background: var(--green);
+}
+.connected .stat-icon {
+  color: var(--green);
+  opacity: 0.8;
 }
 
 /* ── Settings / Other Views ──────────────────────────────────── */

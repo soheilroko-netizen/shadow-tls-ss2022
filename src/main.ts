@@ -17,7 +17,7 @@ interface Config {
   split_domains: string[];
 }
 
-interface TradefaceTrafficData {
+interface TrafficData {
   up: number;
   down: number;
 }
@@ -38,6 +38,7 @@ let timerInterval: number | null = null;
 let trafficInterval: number | null = null;
 let pingInterval: number | null = null;
 let pingHistory: number[] = [];
+let lastTraffic: TrafficData | null = null;
 const MAX_PING_POINTS = 100;
 let logBuffer: string[] = [];
 
@@ -51,11 +52,9 @@ function showView(viewName: string) {
   if (view) view.classList.add('active');
   const navItem = document.getElementById('nav-' + viewName);
   if (navItem) navItem.classList.add('active');
-  // Refresh profiles when entering profile settings
   if (viewName === 'profile-settings') loadProfilesList();
 }
 
-// ── Navigation ────────────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', () => {
     const view = el.getAttribute('data-view');
@@ -67,13 +66,11 @@ document.querySelectorAll('.back-btn').forEach(el => {
   el.addEventListener('click', () => showView('dashboard'));
 });
 
-// ── Profile Selector (sidebar top) ────────────────────────────
+// ── Profile Selector ──────────────────────────────────────────
 $('profile-selector')?.addEventListener('click', () => {
-  const dropdown = $('profile-dropdown');
-  dropdown.classList.toggle('show');
+  $('profile-dropdown').classList.toggle('show');
 });
 
-// Close dropdown on click outside
 document.addEventListener('click', (e) => {
   const sel = $('profile-selector');
   const dd = $('profile-dropdown');
@@ -91,23 +88,51 @@ async function loadProfilesDropdown() {
       `<div class="dropdown-item" data-profile="${p.name}">${p.name}</div>`
     ).join('');
     $('active-profile-name').textContent = store.active_profile;
-    // Bind click on new items
     dd.querySelectorAll('.dropdown-item').forEach(item => {
       item.addEventListener('click', async () => {
         const name = item.getAttribute('data-profile') || '';
-        try {
-          await invoke('switch_profile', { name });
-          $('active-profile-name').textContent = name;
-          dd.classList.remove('show');
-          addLog('Switched to: ' + name);
-          loadConfig();
-          loadProfilesList();
-        } catch (e: any) {
-          addLog('Switch failed: ' + String(e));
-        }
+        await switchAndConnect(name);
+        dd.classList.remove('show');
       });
     });
   } catch { /* ignore */ }
+}
+
+// ── Switch profile + auto-connect ─────────────────────────────
+async function switchAndConnect(name: string) {
+  try {
+    await invoke('switch_profile', { name });
+    $('active-profile-name').textContent = name;
+    addLog('Switched to: ' + name);
+    loadConfig();
+    loadProfilesList();
+
+    // If currently connected, reconnect to new profile
+    if (connected) {
+      // Disconnect first
+      try {
+        await invoke('stop_proxy');
+        connected = false;
+        updateConnectionUI();
+        stopTimers();
+      } catch {}
+
+      // Wait a beat then reconnect
+      setTimeout(async () => {
+        try {
+          await invoke('start_proxy');
+          connected = true;
+          updateConnectionUI();
+          startTimers();
+          addLog('Auto-connected: ' + name);
+        } catch (e: any) {
+          addLog('Auto-connect failed: ' + String(e));
+        }
+      }, 500);
+    }
+  } catch (e: any) {
+    addLog('Switch failed: ' + String(e));
+  }
 }
 
 // ── Connect / Disconnect ──────────────────────────────────────
@@ -157,7 +182,9 @@ function stopTimers() {
   $('stat-time').textContent = '00:00:00';
   $('timer').textContent = '00:00:00';
   pingHistory = [];
+  lastTraffic = null;
   drawPingGraph();
+  $('stat-traffic').textContent = '↑ 0 B · ↓ 0 B';
 }
 
 function updateTimer() {
@@ -171,21 +198,32 @@ function updateTimer() {
   $('stat-time').textContent = time;
 }
 
-// ── Traffic polling (1s) ──────────────────────────────────────
+// ── Traffic: per-second (live), not cumulative ────────────────
 async function startTrafficPolling() {
-  await pollTraffic();
+  lastTraffic = null;
+  await pollTrafficLive();
   if (trafficInterval) clearInterval(trafficInterval);
-  trafficInterval = window.setInterval(pollTraffic, 1000);
+  trafficInterval = window.setInterval(pollTrafficLive, 1000);
 }
 
-async function pollTraffic() {
+async function pollTrafficLive() {
   if (!connected) return;
   try {
     const raw = await invoke<string>('get_total_traffic');
-    const data = JSON.parse(raw) as TradefaceTrafficData;
-    const upFmt = formatBytes(data.up);
-    const downFmt = formatBytes(data.down);
-    $('stat-traffic').textContent = `\u2191 ${upFmt} \u00b7 \u2193 ${downFmt}`;
+    const data = JSON.parse(raw) as TrafficData;
+
+    if (lastTraffic) {
+      // Delta: per-second rate
+      const upDelta = data.up - lastTraffic.up;
+      const downDelta = data.down - lastTraffic.down;
+      // Clamp to non-negative
+      const up = Math.max(0, upDelta);
+      const down = Math.max(0, downDelta);
+      const upFmt = formatBytes(up);
+      const downFmt = formatBytes(down);
+      $('stat-traffic').textContent = `↑ ${upFmt} · ↓ ${downFmt}`;
+    }
+    lastTraffic = data;
   } catch { /* ignore */ }
 }
 
@@ -196,7 +234,7 @@ function formatBytes(bytes: number): string {
   return (bytes / 1073741824).toFixed(2) + ' GB';
 }
 
-// ── Ping polling (1s) ─────────────────────────────────────────
+// ── Ping ───────────────────────────────────────────────────────
 async function startPingPolling() {
   await pollPing();
   if (pingInterval) clearInterval(pingInterval);
@@ -212,7 +250,9 @@ async function pollPing() {
     const latest = pingHistory[pingHistory.length - 1];
     $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
-  } catch { /* ignore */ }
+  } catch (e) {
+    // Don't spam logs, just keep trying
+  }
 }
 
 function drawPingGraph() {
@@ -291,8 +331,8 @@ async function loadConfig() {
       if (config.mtu) ($('mtu') as HTMLInputElement).value = String(config.mtu);
       if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
       if (config.encryption_method) ($('encryption-method') as HTMLSelectElement).value = config.encryption_method;
-      $('server-location').textContent = config.server_address || '\u2014';
-      $('stat-server').textContent = config.server_address || '\u2014';
+      $('server-location').textContent = config.server_address || '—';
+      $('stat-server').textContent = config.server_address || '—';
     }
   } catch { /* config not available */ }
 }
@@ -368,7 +408,6 @@ $('btn-delete-profile')?.addEventListener('click', async () => {
 async function loadProfilesList() {
   try {
     const store = await invoke<ProfileStoreData>('get_profiles');
-    // Update profile name input to active
     $('profile-name-input').value = store.active_profile;
   } catch { /* ignore */ }
 }
@@ -407,8 +446,7 @@ $('btn-save-split')?.addEventListener('click', async () => {
   }
 });
 
-// ── Select/dropdown color fix ─────────────────────────────────
-// Fix white-on-white dropdown issue by setting CSS on select elements
+// ── Fix white select text ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('select').forEach(sel => {
     sel.style.color = '#fff';
