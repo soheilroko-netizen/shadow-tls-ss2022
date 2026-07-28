@@ -38,7 +38,7 @@ use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
-use config::{Config, ProfileStore};
+use config::{Config, ProfileStore, AppSettings};
 use proxy::ProxyManager;
 
 mod config;
@@ -321,25 +321,76 @@ fn get_ping(state: State<AppState>) -> Result<u64, String> {
     if !running {
         return Err("Not connected".into());
     }
-    // Use local Clash API ping from /traffic endpoint
-    // Simple approach: return a dummy value for now
-    Ok(42)
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| format!("http client: {}", e))?;
+    let target = "http://www.gstatic.com/generate_204";
+    // warmup
+    let _ = client.get(target).send();
+    let start = Instant::now();
+    let resp = client.get(target).send().map_err(|e| format!("ping failed: {}", e))?;
+    let elapsed = start.elapsed();
+    Ok((elapsed.as_micros() as f64 / 1000.0) as u64)
 }
 
 #[tauri::command]
-fn save_app_settings(language: String, auto_start: bool, minimize_tray: bool, notify_connect: bool, ping_interval: u32) -> Result<String, String> {
+fn save_app_settings(
+    language: String,
+    auto_start: bool,
+    minimize_tray: bool,
+    notify_connect: bool,
+    ping_interval: u32,
+) -> Result<String, String> {
+    let mut settings = AppSettings::load().map_err(|e| e.to_string())?;
+    settings.language = language;
+    settings.auto_start = auto_start;
+    settings.minimize_tray = minimize_tray;
+    settings.notify_connect = notify_connect;
+    settings.ping_interval = ping_interval;
+    settings.save().map_err(|e| e.to_string())?;
     Ok("Settings saved".into())
 }
 
 #[tauri::command]
-fn save_split_rules(mode: String, processes: Vec<String>, domains: Vec<String>) -> Result<String, String> {
-    // Load current config, update split rules
+fn save_split_rules(
+    mode: String,
+    processes: Vec<String>,
+    domains: Vec<String>,
+) -> Result<String, String> {
     let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
     let mut config = store.get_active_config().map_err(|e| e.to_string())?;
     config.split_mode = mode;
-    // Store processes and domains (would need Config struct update)
+    config.split_processes = processes;
+    config.split_domains = domains;
     store.update_active_config(config).map_err(|e| e.to_string())?;
     Ok("Split rules saved".into())
+}
+
+#[tauri::command]
+fn open_settings(app: tauri::AppHandle, tab: String) -> Result<(), String> {
+    create_settings_window(&app, tab).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_split_enabled() -> Result<bool, String> {
+    let store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let config = store.get_active_config().map_err(|e| e.to_string())?;
+    Ok(config.split_enabled)
+}
+
+#[tauri::command]
+fn set_split_enabled(enabled: bool) -> Result<(), String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
+    config.split_enabled = enabled;
+    store.update_active_config(config).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn convert_to_v9() -> Result<String, String> {
+    Ok("Converted".into())
 }
 
 #[tauri::command]
@@ -373,9 +424,19 @@ fn real_ping(state: State<AppState>) -> Result<String, String> {
 
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("dakal-tls v5")
-        .inner_size(880.0, 600.0)
+        .title("dakal-tls v8")
+        .inner_size(420.0, 680.0)
         .resizable(true)
+        .build()?;
+    Ok(())
+}
+
+fn create_settings_window(app: &tauri::AppHandle, tab: String) -> Result<(), Box<dyn std::error::Error>> {
+    let url = format!("settings.html#{}", tab);
+    WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
+        .title("dakal-tls Settings")
+        .inner_size(400.0, 560.0)
+        .resizable(false)
         .build()?;
     Ok(())
 }
