@@ -39,7 +39,7 @@ $('btn-save-profile')?.addEventListener('click', async () => {
     await window.__TAURI__.invoke('save_config', { config });
     alert('Profile saved');
     closeSettings();
-    window.location.hash = tab;
+    window.location.hash = currentTab;
   } catch (e: any) {
     alert('Save failed: ' + String(e));
   }
@@ -69,7 +69,7 @@ $('btn-add-profile')?.addEventListener('click', async () => {
     await window.__TAURI__.invoke('add_profile', { name, config });
     alert('Profile created: ' + name);
     closeSettings();
-    window.location.hash = tab;
+    window.location.hash = currentTab;
   } catch (e: any) {
     alert('Create failed: ' + String(e));
   }
@@ -85,7 +85,7 @@ $('btn-delete-profile')?.addEventListener('click', async () => {
     await window.__TAURI__.invoke('delete_profile', { name });
     alert('Deleted: ' + name);
     closeSettings();
-    window.location.hash = tab;
+    window.location.hash = currentTab;
   } catch (e: any) {
     alert('Delete failed: ' + String(e));
   }
@@ -103,7 +103,7 @@ $('btn-save-app')?.addEventListener('click', async () => {
     });
     alert('App settings saved');
     closeSettings();
-    window.location.hash = tab;
+    window.location.hash = currentTab;
   } catch (e: any) {
     alert('Save failed: ' + String(e));
   }
@@ -124,7 +124,7 @@ $('btn-save-split')?.addEventListener('click', async () => {
     });
     alert('Split rules saved');
     closeSettings();
-    window.location.hash = tab;
+    window.location.hash = currentTab;
   } catch (e: any) {
     alert('Save failed: ' + String(e));
   }

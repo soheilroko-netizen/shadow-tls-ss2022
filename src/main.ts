@@ -233,7 +233,7 @@ async function pollPing() {
     const latest = pingHistory[pingHistory.length - 1];
     $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
-  } catch: any {
+  } catch (e: any) {
     $('ping-value').textContent = '— ms';
   }
 }
@@ -319,7 +319,7 @@ $('btn-add-profile')?.addEventListener('click', async () => {
     await invoke('add_profile', { name, config });
     addLog('Profile created: ' + name);
     loadProfilesDropdown();
-  } catch: any {
+  } catch (e: any) {
     addLog('Create failed: ' + String(e));
   }
 });
