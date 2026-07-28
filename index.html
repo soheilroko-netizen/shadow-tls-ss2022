@@ -6,252 +6,271 @@
   <title>dakal-tls</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
-  <div id="bg" class="bg-full"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <svg viewBox="0 0 28 28" fill="none" stroke="#7170ff" stroke-width="2" width="20" height="20">
+        <circle cx="14" cy="14" r="11"/>
+        <path d="M14 4v12M8 10l6 6 6-6"/>
+      </svg>
+      <span>dakal</span>
+    </div>
 
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-inner">
-      <div class="profile-selector" id="profile-selector">
-        <div class="avatar">G</div>
-        <div class="profile-info">
-          <div class="profile-name" id="active-profile-name">Germany 1</div>
-          <div class="profile-label">Active Profile</div>
-        </div>
-        <div class="profile-arrow" id="profile-arrow">&#x25be;</div>
+    <div class="profile-card" id="profile-selector">
+      <div class="profile-avatar" id="profile-avatar">G</div>
+      <div class="profile-meta">
+        <div class="profile-label">Active Profile</div>
+        <div class="profile-name" id="active-profile-name">Germany 1</div>
       </div>
-      <div class="profile-dropdown" id="profile-dropdown"></div>
+      <svg class="profile-chevron" viewBox="0 0 16 16" fill="currentColor" width="12" height="12"><path d="M4 6l4 4 4-4"/></svg>
+    </div>
+    <div class="profile-dropdown" id="profile-dropdown"></div>
 
-      <nav class="nav">
-        <div class="nav-item active" data-view="dashboard" id="nav-dashboard">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h6v8H3V3zm0 10h6v4H3v-4zm8-10h6v4h-6V3zm0 6h6v8h-6V9z"/></svg>
-          <span>Dashboard</span>
-        </div>
-        <div class="nav-item" data-view="profile-settings" id="nav-profile-settings">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16z"/></svg>
-          <span>Profile Settings</span>
-        </div>
-        <div class="nav-item" data-view="split-tunnel" id="nav-split-tunnel">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8-6a6 6 0 100 12 6 6 0 000-12z"/><path d="M10 6a1 1 0 011 1v3a1 1 0 01-1 1H7a1 1 0 110-2h2V7a1 1 0 011-1z"/></svg>
-          <span>Split Tunnel</span>
-        </div>
-        <div class="nav-item" data-view="log" id="nav-log">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 1a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1V5zm0 4a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1V9zm0 4a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-1z"/></svg>
-          <span>Log</span>
-        </div>
-      </nav>
+    <nav class="nav">
+      <button class="nav-item active" data-view="dashboard" id="nav-dashboard">
+        <svg class="nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="6" height="7" rx="1"/><rect x="10" y="2" width="6" height="14" rx="1"/><rect x="2" y="11" width="6" height="5" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="profile-settings" id="nav-profile-settings">
+        <svg class="nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M3 15c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+        <span>Profiles</span>
+      </button>
+      <button class="nav-item" data-view="split-tunnel" id="nav-split-tunnel">
+        <svg class="nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="7"/><path d="M9 5v8M5 9h8"/></svg>
+        <span>Split Tunnel</span>
+      </button>
+      <button class="nav-item" data-view="log" id="nav-log">
+        <svg class="nav-icon" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 3h10M4 9h10M4 15h6"/></svg>
+        <span>Log</span>
+      </button>
+    </nav>
 
-      <div class="sidebar-footer">
-        <span class="version">v7.0</span>
-      </div>
+    <div class="sidebar-foot">
+      <span class="ver">v7.0</span>
     </div>
   </aside>
 
   <main id="main">
     <div class="view active" id="view-dashboard">
-      <!-- Power button centered in main area (window - sidebar) -->
-      <div class="power-center" id="power-center">
+      <div class="dash-center">
         <button class="power-btn" id="btn-connect">
-          <div class="power-ring" id="power-ring"></div>
-          <div class="power-icon-wrap">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="28" height="28">
-              <path d="M12 3v9m-6.5-6A8 8 0 1119 6"/>
-            </svg>
-          </div>
+          <svg class="power-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 4v8m-5.5-3.5A7 7 0 1118 9"/>
+          </svg>
         </button>
+
         <div class="status-section">
-          <div class="status-badge" id="status-badge">
-            <span class="status-dot" id="status-dot"></span>
-            <span id="status-text">Disconnected</span>
+          <div class="status-dot-row">
+            <span class="status-dot-lg" id="status-dot"></span>
+            <span class="status-label" id="status-text">Disconnected</span>
           </div>
-          <div class="server-location" id="server-location">&#x2014;</div>
+          <div class="serv-loc" id="server-location">&mdash;</div>
           <div class="timer" id="timer">00:00:00</div>
         </div>
       </div>
 
-      <!-- Widget: Ping + Usage combined -->
-      <div class="widgets-stack" id="widgets-stack">
-        <!-- Usage Widget (on top of ping) -->
-        <div class="usage-widget" id="usage-widget">
-          <div class="widget-label">LIVE</div>
-          <div class="usage-live" id="usage-live">&#x2191; 0 B &#xB7; &#x2193; 0 B</div>
-          <div class="widget-label" style="margin-top:4px;">TOTAL</div>
-          <div class="usage-total" id="usage-total">&#x2191; 0 B &#xB7; &#x2193; 0 B</div>
-        </div>
-
-        <!-- Ping Widget -->
-        <div class="ping-widget" id="ping-widget">
-          <div class="ping-header">
-            <span class="ping-label">PING</span>
+      <div class="dash-widgets">
+        <div class="widget usage-widget-box">
+          <div class="widget-hdr">
+            <span class="widget-title">Usage</span>
+            <span class="widget-badge live-badge">LIVE</span>
           </div>
-          <div class="ping-value" id="ping-value">&#x2014;</div>
-          <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
+          <div class="usage-val" id="usage-live">&uarr; 0 B &middot; &darr; 0 B</div>
+          <div class="usage-div"></div>
+          <div class="usage-total-row">
+            <span class="usage-label">Total</span>
+            <span class="usage-val-total" id="usage-total">&uarr; 0 B &middot; &darr; 0 B</span>
+          </div>
         </div>
 
-        <!-- Bottom info bar (single line: server + time) -->
-        <div class="info-bar" id="info-bar">
-          <span id="info-server" class="info-server">&#x2014;</span>
-          <span class="info-sep">&#xB7;</span>
-          <span id="info-time" class="info-time">00:00:00</span>
+        <div class="widget ping-widget-box">
+          <div class="widget-hdr">
+            <span class="widget-title">Ping</span>
+          </div>
+          <div class="ping-val" id="ping-value">&mdash;</div>
+          <canvas class="ping-canvas" id="ping-graph" width="180" height="32"></canvas>
+        </div>
+
+        <div class="widget info-widget">
+          <div class="info-blob">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" width="12" height="12"><circle cx="7" cy="7" r="5"/><path d="M7 5v3M7 9v1"/></svg>
+            <span id="info-server" class="info-server">&mdash;</span>
+          </div>
+          <div class="info-blob">
+            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" width="12" height="12"><circle cx="7" cy="7" r="5"/><path d="M7 4v4"/></svg>
+            <span id="info-time" class="info-time">00:00:00</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Profile Settings View -->
     <div class="view" id="view-profile-settings">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
+      <header class="view-hdr">
+        <button class="btn-back" data-view="dashboard">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
         <h2>Profile Settings</h2>
-      </div>
-      <div class="settings-form">
-        <div class="form-group">
-          <label>Profile Name</label>
-          <input type="text" id="profile-name-input" value="Germany 1">
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Server Address</label>
-            <input type="text" id="server-address" placeholder="ns.baft.uk">
+      </header>
+      <div class="settings-scroll">
+        <div class="s-form">
+          <div class="sg">
+            <label>Profile Name</label>
+            <input type="text" id="profile-name-input" value="Germany 1">
           </div>
-          <div class="form-group half">
-            <label>Socks5 Port</label>
-            <input type="number" id="socks5-port" placeholder="1080" value="1080">
+          <div class="sg-row">
+            <div class="sg half">
+              <label>Server Address</label>
+              <input type="text" id="server-address" placeholder="ns.baft.uk">
+            </div>
+            <div class="sg half">
+              <label>Socks5 Port</label>
+              <input type="number" id="socks5-port" placeholder="1080" value="1080">
+            </div>
           </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>SS Port</label>
-            <input type="number" id="ss-port" placeholder="8380" value="8380">
+          <div class="sg-row">
+            <div class="sg half">
+              <label>SS Port</label>
+              <input type="number" id="ss-port" placeholder="8380" value="8380">
+            </div>
+            <div class="sg half">
+              <label>SS Password</label>
+              <input type="password" id="ss-password" placeholder="ss pass">
+            </div>
           </div>
-          <div class="form-group half">
-            <label>SS Password</label>
-            <input type="password" id="ss-password" placeholder="SS password">
+          <div class="sg-row">
+            <div class="sg half">
+              <label>ShadowTLS Port</label>
+              <input type="number" id="stls-port" placeholder="8553" value="8553">
+            </div>
+            <div class="sg half">
+              <label>ShadowTLS Password</label>
+              <input type="password" id="stls-password" placeholder="stls pass">
+            </div>
           </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>ShadowTLS Port</label>
-            <input type="number" id="stls-port" placeholder="8553" value="8553">
+          <div class="sg">
+            <label>ShadowTLS SNI</label>
+            <input type="text" id="stls-sni" placeholder="dl.google.com" value="dl.google.com">
           </div>
-          <div class="form-group half">
-            <label>ShadowTLS Password</label>
-            <input type="password" id="stls-password" placeholder="STLS password">
+          <div class="sg-row">
+            <div class="sg half">
+              <label>Encryption</label>
+              <select id="encryption-method">
+                <option value="aes-256-gcm">AES-256-GCM</option>
+                <option value="chacha20-ietf-poly1305">ChaCha20-Poly1305</option>
+                <option value="aes-128-gcm">AES-128-GCM</option>
+                <option value="2022-blake3-aes-256-gcm">2022-Blake3-AES-256-GCM</option>
+              </select>
+            </div>
+            <div class="sg half">
+              <label>MTU</label>
+              <input type="number" id="mtu" placeholder="1500">
+            </div>
           </div>
-        </div>
-        <div class="form-group">
-          <label>ShadowTLS SNI</label>
-          <input type="text" id="stls-sni" placeholder="dl.google.com" value="dl.google.com">
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Encryption Method</label>
-            <select id="encryption-method">
-              <option value="aes-256-gcm">AES-256-GCM</option>
-              <option value="chacha20-ietf-poly1305">ChaCha20-Poly1305</option>
-              <option value="aes-128-gcm">AES-128-GCM</option>
-              <option value="2022-blake3-aes-256-gcm">2022-Blake3-AES-256-GCM</option>
+          <div class="sg">
+            <label>Auto Connect</label>
+            <select id="auto-connect">
+              <option value="true">Enabled</option>
+              <option value="false" selected>Disabled</option>
             </select>
           </div>
-          <div class="form-group half">
-            <label>MTU</label>
-            <input type="number" id="mtu" placeholder="1500">
+          <div class="sg-actions">
+            <button class="btn-primary" id="btn-save-profile">Save</button>
+            <button class="btn-secondary" id="btn-add-profile">+ Add</button>
+            <button class="btn-danger" id="btn-delete-profile">Delete</button>
           </div>
         </div>
-        <div class="form-group">
-          <label>Auto Connect</label>
-          <select id="auto-connect">
-            <option value="true">Enabled</option>
-            <option value="false" selected>Disabled</option>
-          </select>
-        </div>
-        <div class="profile-actions">
-          <button class="btn-save" id="btn-save-profile">Save Profile</button>
-          <button class="btn-add" id="btn-add-profile">+ Add Profile</button>
-          <button class="btn-delete" id="btn-delete-profile">Delete</button>
-        </div>
       </div>
     </div>
 
-    <!-- App Settings View -->
     <div class="view" id="view-app-settings">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
+      <header class="view-hdr">
+        <button class="btn-back" data-view="dashboard">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
         <h2>App Settings</h2>
-      </div>
-      <div class="settings-form">
-        <div class="form-group">
-          <label>Language</label>
-          <select id="language">
-            <option value="en">English</option>
-            <option value="fa">&#x641;&#x627;&#x631;&#x633;&#x6CC;</option>
-          </select>
+      </header>
+      <div class="settings-scroll">
+        <div class="s-form">
+          <div class="sg">
+            <label>Language</label>
+            <select id="language">
+              <option value="en">English</option>
+              <option value="fa">فارسی</option>
+            </select>
+          </div>
+          <div class="sg">
+            <label>Auto-start on boot</label>
+            <select id="auto-start">
+              <option value="true">Enabled</option>
+              <option value="false" selected>Disabled</option>
+            </select>
+          </div>
+          <div class="sg">
+            <label>Minimize to tray</label>
+            <select id="minimize-tray">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="sg">
+            <label>Notification on connect</label>
+            <select id="notif-connect">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="sg">
+            <label>Ping interval (seconds)</label>
+            <input type="number" id="ping-interval" value="1">
+          </div>
+          <button class="btn-primary" id="btn-save-app">Save Settings</button>
         </div>
-        <div class="form-group">
-          <label>Auto-start on boot</label>
-          <select id="auto-start">
-            <option value="true">Enabled</option>
-            <option value="false" selected>Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Minimize to tray</label>
-          <select id="minimize-tray">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Notification on connect</label>
-          <select id="notif-connect">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Ping interval (seconds)</label>
-          <input type="number" id="ping-interval" value="1">
-        </div>
-        <button class="btn-save" id="btn-save-app">Save Settings</button>
       </div>
     </div>
 
-    <!-- Split Tunnel View -->
     <div class="view" id="view-split-tunnel">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
+      <header class="view-hdr">
+        <button class="btn-back" data-view="dashboard">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
         <h2>Split Tunnel</h2>
-      </div>
-      <div class="split-tunnel-panel">
-        <div class="form-group">
-          <label>Mode</label>
-          <select id="split-mode">
-            <option value="exclude">Exclude (bypass VPN)</option>
-            <option value="include">Include (only VPN)</option>
-          </select>
+      </header>
+      <div class="settings-scroll">
+        <div class="s-form">
+          <div class="sg">
+            <label>Mode</label>
+            <select id="split-mode">
+              <option value="exclude">Exclude (bypass VPN)</option>
+              <option value="include">Include (only through VPN)</option>
+            </select>
+          </div>
+          <div class="sg">
+            <label>Process Names</label>
+            <textarea id="split-processes" rows="3" placeholder="chrome.exe&#10;firefox.exe"></textarea>
+          </div>
+          <div class="sg">
+            <label>Domain/IP Rules</label>
+            <textarea id="split-domains" rows="3" placeholder="example.com&#10;192.168.1.0/24"></textarea>
+          </div>
+          <button class="btn-primary" id="btn-save-split">Save Rules</button>
         </div>
-        <div class="form-group">
-          <label>Process Names (one per line)</label>
-          <textarea id="split-processes" rows="4" placeholder="chrome.exe&#10;firefox.exe"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Domain/IP Rules (one per line)</label>
-          <textarea id="split-domains" rows="4" placeholder="example.com&#10;192.168.1.0/24"></textarea>
-        </div>
-        <button class="btn-save" id="btn-save-split">Save Rules</button>
       </div>
     </div>
 
-    <!-- Log View -->
     <div class="view" id="view-log">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
+      <header class="view-hdr">
+        <button class="btn-back" data-view="dashboard">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
         <h2>Connection Log</h2>
-        <button class="btn-clear-log" id="btn-clear-log">Clear</button>
-      </div>
-      <div class="log-container" id="log-container">
-        <div class="log-placeholder">No events yet.</div>
+        <button class="btn-ghost" id="btn-clear-log">Clear</button>
+      </header>
+      <div class="log-box" id="log-container">
+        <div class="log-empty">No events yet.</div>
       </div>
     </div>
   </main>

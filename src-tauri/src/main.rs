@@ -539,6 +539,7 @@ fn main() {
             switch_profile,
             switch_profile_stop,
             real_ping,
+            get_ping,
             get_traffic,
             get_total_traffic,
             get_uptime,
