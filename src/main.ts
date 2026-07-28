@@ -1,332 +1,336 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
+// ── Types ─────────────────────────────────────────────────────
+interface Profile {
+  name: string;
+  server_address: string;
+  tun_name: string;
+  mtu: number | null;
+  auto_connect: boolean;
+}
+
 interface Config {
   server_address: string;
-  ss_port: number;
-  ss_password: string;
-  stls_port: number;
-  stls_password: string;
-  stls_sni: string;
-  socks5_port: number;
+  tun_name: string;
   mtu: number | null;
-  split_rules: SplitRule[];
-}
-interface SplitRule { pattern: string; }
-interface Profile { name: string; config: Config; }
-interface ProfileStore { profiles: Profile[]; active_profile: string; }
-
-const WIN_MAIN = { w: 800, h: 500 };
-const WIN_SETTINGS = { w: 600, h: 750 };
-
-async function setSize(w: number, h: number) {
-  try { await getCurrentWindow().setSize({ type: 'Logical', width: w, height: h }); } catch {}
+  auto_connect: boolean;
+  split_mode: string;
+  split_processes: string[];
+  split_domains: string[];
 }
 
-let currentView = 'main';
-
-function showView(name: string) {
-  document.querySelectorAll('.view').forEach(v => (v as HTMLElement).style.display = 'none');
-  const el = document.getElementById('view-' + name);
-  if (el) {
-    el.style.display = 'flex';
-    (el as HTMLElement).classList.add('active');
-  }
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const navBtn = document.querySelector('.nav-item[data-view="' + name + '"]');
-  if (navBtn) navBtn.classList.add('active');
-  currentView = name;
-  if (name === 'main') setSize(WIN_MAIN.w, WIN_MAIN.h);
-  else setSize(WIN_SETTINGS.w, WIN_SETTINGS.h);
+interface TrafficData {
+  up: number;
+  down: number;
 }
 
-// ── Connection ───────────────────────────────────────────
-
+// ── State ──────────────────────────────────────────────────────
 let connected = false;
+let connectStart = 0;
+let timerInterval: number | null = null;
+let trafficInterval: number | null = null;
+let pingInterval: number | null = null;
+let pingHistory: number[] = [];
+const MAX_PING_POINTS = 30;
+let logBuffer: string[] = [];
 
-async function updateStatus() {
-  try {
-    const running = await invoke<boolean>('get_status');
-    connected = running;
-    const badge = document.getElementById('status-badge')!;
-    const txt = document.getElementById('status-text')!;
-    const planet = document.getElementById('planet-icon')!;
-    if (running) {
-      badge.className = 'status-badge connected';
-      txt.textContent = 'Connected';
-      planet.classList.add('connected');
-    } else {
-      badge.className = 'status-badge disconnected';
-      txt.textContent = 'Disconnected';
-      planet.classList.remove('connected');
-    }
-  } catch {}
+// ── DOM refs ───────────────────────────────────────────────────
+const $ = (id: string) => document.getElementById(id)!;
+
+// ── View switching ─────────────────────────────────────────────
+function showView(viewName: string) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const view = document.getElementById('view-' + viewName);
+  if (view) view.classList.add('active');
+  const navItem = document.getElementById('nav-' + viewName);
+  if (navItem) navItem.classList.add('active');
 }
 
-async function toggleConnect() {
-  if (connected) {
-    try { await invoke('stop_proxy'); } catch {}
+// ── Window controls ────────────────────────────────────────────
+function setupWindowControls() {
+  const win = getCurrentWindow();
+  $('win-min')?.addEventListener('click', () => win.minimize());
+  $('win-max')?.addEventListener('click', () => win.toggleMaximize());
+  $('win-close')?.addEventListener('click', () => win.close());
+}
+
+// ── Navigation ─────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    const view = el.getAttribute('data-view');
+    if (view) showView(view);
+  });
+});
+
+document.querySelectorAll('.back-btn').forEach(el => {
+  el.addEventListener('click', () => showView('dashboard'));
+});
+
+// ── Server select ──────────────────────────────────────────────
+$('server-select')?.addEventListener('click', async () => {
+  try {
+    const serversStr = await invoke<string>('get_servers');
+    const servers: string[] = JSON.parse(serversStr);
+    // Simple cycle through servers for now
+    const current = $('server-name').textContent;
+    const idx = servers.indexOf(current || '');
+    const next = idx >= 0 && idx < servers.length - 1 ? servers[idx + 1] : servers[0];
+    if (next) {
+      $('server-name').textContent = next;
+      await invoke('set_server', { server: next });
+    }
+  } catch { /* no server list available */ }
+});
+
+// ── Profile card ───────────────────────────────────────────────
+$('sidebar-profile')?.addEventListener('click', () => showView('profile-settings'));
+
+// ── Settings quick button ──────────────────────────────────────
+$('btn-settings-quick')?.addEventListener('click', () => showView('app-settings'));
+
+// ── Connect / Disconnect ───────────────────────────────────────
+$('btn-connect')?.addEventListener('click', async () => {
+  if (!connected) {
+    try {
+      await invoke('connect');
+      connected = true;
+      updateConnectionUI();
+      startTimers();
+      addLog('Connected to server');
+    } catch (e: any) {
+      addLog('Connection failed: ' + String(e));
+    }
   } else {
-    try { await invoke('start_proxy'); } catch {}
-  }
-  await updateStatus();
-  if (connected) setTimeout(doPing, 1500);
-}
-
-// ── Ping ─────────────────────────────────────────────────
-
-async function doPing() {
-  try {
-    const el = document.getElementById('ping-value')!;
-    el.textContent = '...';
-    const ms = await invoke<string>('real_ping');
-    el.textContent = ms;
-  } catch {
-    document.getElementById('ping-value')!.textContent = 'TIMEOUT';
-  }
-}
-
-// ── Server info ──────────────────────────────────────────
-
-async function updateServerInfo() {
-  try {
-    const config = await invoke<Config>('get_config');
-    const name = config.server_address + ':' + config.stls_port;
-    document.getElementById('server-name')!.textContent = name;
-    document.getElementById('bottom-server')!.textContent = name;
-  } catch {}
-}
-
-function formatBytes(b: number): string {
-  if (b === 0) return '0';
-  if (b < 1024) return b + ' B';
-  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
-  if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
-  return (b/(1024*1024*1024)).toFixed(2) + ' GB';
-}
-
-async function updateTraffic() {
-  try {
-    const raw = await invoke<string>('get_traffic');
-    const v = JSON.parse(raw);
-    document.getElementById('bottom-traffic')!.textContent = '\u2191 ' + formatBytes(v.up) + '  \u2193 ' + formatBytes(v.down);
-  } catch {}
-}
-
-function pad(n: number) { return n.toString().padStart(2, '0'); }
-
-async function updateUptime() {
-  try {
-    const secs = await invoke<number>('get_uptime');
-    const el = document.getElementById('timer')!;
-    const bottomEl = document.getElementById('bottom-uptime')!;
-    if (secs === 0) {
-      el.textContent = '00:00';
-      bottomEl.textContent = '00:00';
-      return;
+    try {
+      await invoke('disconnect');
+      connected = false;
+      updateConnectionUI();
+      stopTimers();
+      addLog('Disconnected');
+    } catch (e: any) {
+      addLog('Disconnect failed: ' + String(e));
     }
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    const t = h > 0 ? h + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
-    el.textContent = t;
-    bottomEl.textContent = t;
-  } catch {}
+  }
+});
+
+function updateConnectionUI() {
+  const main = document.querySelector('#main')!;
+  main.classList.toggle('connected', connected);
+  $('status-text').textContent = connected ? 'CONNECTED' : 'Disconnected';
+  $('status-dot').style.background = connected ? 'var(--green)' : 'var(--text-dim)';
 }
 
-// ── Profile management ───────────────────────────────────
+function startTimers() {
+  connectStart = Date.now();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = window.setInterval(updateTimer, 1000);
+  updateTimer();
+  startTrafficPolling();
+  startPingPolling();
+}
 
-async function loadProfiles() {
+function stopTimers() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  if (trafficInterval) { clearInterval(trafficInterval); trafficInterval = null; }
+  if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+  $('stat-time').textContent = '00:00:00';
+  $('timer').textContent = '00:00:00';
+}
+
+function updateTimer() {
+  if (!connectStart) return;
+  const elapsed = Math.floor((Date.now() - connectStart) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  const time = `${h}:${m}:${s}`;
+  $('timer').textContent = time;
+  $('stat-time').textContent = time;
+}
+
+// ── Traffic polling ────────────────────────────────────────────
+async function startTrafficPolling() {
+  await pollTraffic();
+  if (trafficInterval) clearInterval(trafficInterval);
+  trafficInterval = window.setInterval(pollTraffic, 3000);
+}
+
+async function pollTraffic() {
+  if (!connected) return;
   try {
-    const store = await invoke<ProfileStore>('get_profiles');
-    const selects = ['sidebar-profile-select', 'server-profile-select', 'settings-profile-select'];
-    selects.forEach(id => {
-      const sel = document.getElementById(id) as HTMLSelectElement;
-      if (!sel) return;
-      const cur = sel.value;
-      sel.innerHTML = '';
-      store.profiles.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.name;
-        opt.textContent = p.name;
-        sel.appendChild(opt);
-      });
-      if (cur && store.profiles.some(p => p.name === cur)) sel.value = cur;
-    });
-  } catch {}
+    const data = await invoke<TrafficData>('get_total_traffic');
+    const upFmt = formatBytes(data.up);
+    const downFmt = formatBytes(data.down);
+    $('stat-traffic').textContent = `↑ ${upFmt} · ↓ ${downFmt}`;
+  } catch { /* ignore polling errors */ }
 }
 
-async function profileChanged(id: string) {
-  const sel = document.getElementById(id) as HTMLSelectElement;
-  const name = sel.value;
-  if (!name) return;
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+// ── Ping polling ───────────────────────────────────────────────
+async function startPingPolling() {
+  await pollPing();
+  if (pingInterval) clearInterval(pingInterval);
+  pingInterval = window.setInterval(pollPing, 5000);
+}
+
+async function pollPing() {
+  if (!connected) return;
   try {
-    await invoke('switch_profile_stop', { name });
-    // sync all selects
-    const others = ['sidebar-profile-select', 'server-profile-select', 'settings-profile-select'].filter(x => x !== id);
-    others.forEach(oid => {
-      const osel = document.getElementById(oid) as HTMLSelectElement;
-      if (osel) osel.value = name;
-    });
-    updateServerInfo();
-    updateStatus();
-  } catch {}
+    const ping = await invoke<number>('get_ping');
+    pingHistory.push(ping);
+    if (pingHistory.length > MAX_PING_POINTS) pingHistory.shift();
+    const avg = pingHistory.reduce((a, b) => a + b, 0) / pingHistory.length;
+    $('ping-value').textContent = Math.round(avg) + ' ms';
+    drawPingGraph();
+  } catch { /* ignore */ }
 }
 
-// ── Settings ─────────────────────────────────────────────
+function drawPingGraph() {
+  const canvas = $('ping-graph') as HTMLCanvasElement;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  if (pingHistory.length < 2) return;
 
+  const max = Math.max(...pingHistory, 1);
+  ctx.beginPath();
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+
+  pingHistory.forEach((val, i) => {
+    const x = (i / (MAX_PING_POINTS - 1)) * w;
+    const y = h - (val / max) * (h - 4) - 2;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill below line
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(34, 211, 238, 0.2)');
+  grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+// ── Log ────────────────────────────────────────────────────────
+function addLog(msg: string) {
+  const ts = new Date().toLocaleTimeString();
+  logBuffer.push(`[${ts}] ${msg}`);
+  renderLog();
+}
+
+function renderLog() {
+  const container = $('log-container');
+  if (!container) return;
+  if (logBuffer.length === 0) {
+    container.innerHTML = '<div class="log-placeholder">No events yet.</div>';
+    return;
+  }
+  container.innerHTML = logBuffer.map(l => `<div class="log-entry">${escapeHtml(l)}</div>`).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(s: string): string {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+$('btn-clear-log')?.addEventListener('click', () => {
+  logBuffer = [];
+  renderLog();
+});
+
+// ── Load config on startup ─────────────────────────────────────
 async function loadConfig() {
   try {
     const config = await invoke<Config>('get_config');
-    (document.getElementById('server_address') as HTMLInputElement).value = config.server_address;
-    (document.getElementById('ss_port') as HTMLInputElement).value = config.ss_port.toString();
-    (document.getElementById('ss_password') as HTMLInputElement).value = config.ss_password;
-    (document.getElementById('stls_port') as HTMLInputElement).value = config.stls_port.toString();
-    (document.getElementById('stls_password') as HTMLInputElement).value = config.stls_password;
-    (document.getElementById('stls_sni') as HTMLInputElement).value = config.stls_sni;
-    (document.getElementById('socks5_port') as HTMLInputElement).value = config.socks5_port.toString();
-    (document.getElementById('mtu') as HTMLInputElement).value = config.mtu ? config.mtu.toString() : '';
-    (document.getElementById('split_rules_view') as HTMLTextAreaElement).value = config.split_rules.map(r => r.pattern).join('\\n');
-  } catch {}
-}
-
-async function saveConfig(e: Event) {
-  e.preventDefault();
-  const mtuRaw = (document.getElementById('mtu') as HTMLInputElement).value;
-  const config: Config = {
-    server_address: (document.getElementById('server_address') as HTMLInputElement).value,
-    ss_port: parseInt((document.getElementById('ss_port') as HTMLInputElement).value),
-    ss_password: (document.getElementById('ss_password') as HTMLInputElement).value,
-    stls_port: parseInt((document.getElementById('stls_port') as HTMLInputElement).value),
-    stls_password: (document.getElementById('stls_password') as HTMLInputElement).value,
-    stls_sni: (document.getElementById('stls_sni') as HTMLInputElement).value,
-    socks5_port: parseInt((document.getElementById('socks5_port') as HTMLInputElement).value),
-    mtu: mtuRaw ? parseInt(mtuRaw) : null,
-    split_rules: [],
-  };
-  // Re-read split_rules from settings form if available
-  const splitEl = document.getElementById('split_rules') as HTMLTextAreaElement;
-  if (splitEl) {
-    config.split_rules = splitEl.value.split('\\n').map(s => s.trim()).filter(s => s.length > 0).map(s => ({ pattern: s }));
-  }
-  try {
-    await invoke('save_config', { config });
-    showMsg('settings-message', 'Saved!', 'success');
-    updateServerInfo();
-  } catch (err) {
-    showMsg('settings-message', 'Failed: ' + err, 'error');
-  }
-}
-
-async function newProfile() {
-  const name = prompt('Profile name:');
-  if (!name || !name.trim()) return;
-  try {
-    await invoke('add_profile', { name: name.trim(), config: await invoke<Config>('get_config') });
-    await loadProfiles();
-    showMsg('settings-message', 'Created!', 'success');
-  } catch (err) {
-    showMsg('settings-message', 'Failed: ' + err, 'error');
-  }
-}
-
-async function deleteProfile() {
-  const sel = document.getElementById('settings-profile-select') as HTMLSelectElement;
-  const name = sel.value;
-  if (name === 'Default') { showMsg('settings-message', 'Cannot delete Default', 'error'); return; }
-  if (!confirm('Delete "' + name + '"?')) return;
-  try {
-    await invoke('delete_profile', { name });
-    await loadProfiles();
-    showMsg('settings-message', 'Deleted', 'success');
-  } catch (err) {
-    showMsg('settings-message', 'Failed: ' + err, 'error');
-  }
-}
-
-function showMsg(id: string, text: string, type: 'success' | 'error') {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = text;
-  el.className = 'msg ' + type;
-  setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 3000);
-}
-
-// ── Log ──────────────────────────────────────────────────
-
-async function refreshLog() {
-  try {
-    const log = await invoke<string>('get_log');
-    document.getElementById('log-content')!.textContent = log;
-  } catch (err) {
-    document.getElementById('log-content')!.textContent = 'Error: ' + err;
-  }
-}
-
-// ── Polling ──────────────────────────────────────────────
-
-let polling = false;
-async function startPolling() {
-  if (polling) return;
-  polling = true;
-  while (polling) {
-    try {
-      if (await invoke<boolean>('get_status')) {
-        await updateTraffic();
-        await updateUptime();
-      }
-    } catch {}
-    await new Promise(r => setTimeout(r, 2000));
-  }
-}
-
-// ── DOM Ready ─────────────────────────────────────────────
-
-document.addEventListener('DOMContentLoaded', () => {
-  // Nav
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.addEventListener('click', () => showView((el as HTMLElement).dataset.view!));
-  });
-  document.querySelectorAll('.back-btn').forEach(el => {
-    el.addEventListener('click', () => showView((el as HTMLElement).dataset.view!));
-  });
-
-  // Connect
-  document.getElementById('planet-icon')!.addEventListener('click', toggleConnect);
-
-  // Profile selects
-  ['sidebar-profile-select', 'server-profile-select'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => profileChanged(id));
-  });
-  document.getElementById('settings-profile-select')?.addEventListener('change', () => {
-    loadConfig();
-  });
-
-  // Settings
-  document.getElementById('settings-form')?.addEventListener('submit', saveConfig);
-  document.getElementById('btn-new-profile')?.addEventListener('click', newProfile);
-  document.getElementById('btn-delete-profile')?.addEventListener('click', deleteProfile);
-  document.getElementById('btn-settings-quick')?.addEventListener('click', () => showView('settings'));
-  document.getElementById('btn-refresh-log')?.addEventListener('click', refreshLog);
-
-  // Split tunnel save
-  document.getElementById('btn-split-save')?.addEventListener('click', async () => {
-    const ta = document.getElementById('split_rules_view') as HTMLTextAreaElement;
-    if (!ta) return;
-    try {
-      const config = await invoke<Config>('get_config');
-      config.split_rules = ta.value.split('\\n').map(s => s.trim()).filter(s => s.length > 0).map(s => ({ pattern: s }));
-      await invoke('save_config', { config });
-      showMsg('split-msg', 'Split rules saved!', 'success');
-    } catch (err) {
-      showMsg('split-msg', 'Failed: ' + err, 'error');
+    if (config) {
+      if (config.server_address) $('server-address').value = config.server_address;
+      if (config.tun_name) $('tun-name').value = config.tun_name;
+      if (config.mtu) ($('mtu') as HTMLInputElement).value = String(config.mtu);
+      if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
+      if (config.split_mode) ($('split-mode') as HTMLSelectElement).value = config.split_mode;
+      if (config.split_processes) ($('split-processes') as HTMLTextAreaElement).value = config.split_processes.join('\n');
+      if (config.split_domains) ($('split-domains') as HTMLTextAreaElement).value = config.split_domains.join('\n');
+      // Show server in top bar
+      const addr = config.server_address || '';
+      const parts = addr.split(':');
+      $('server-name').textContent = parts.length > 1 ? `Server :${parts[1]}` : addr || 'Germany - Frankfurt';
+      $('server-location').textContent = config.server_address || '\u2014';
+      $('stat-server').textContent = config.server_address || '\u2014';
     }
-  });
+  } catch { /* config not available */ }
+}
 
-  // Init
-  updateServerInfo();
-  loadProfiles();
-  updateStatus();
-  setInterval(updateStatus, 2000);
-  startPolling();
+// ── Save Profile ───────────────────────────────────────────────
+$('btn-save-profile')?.addEventListener('click', async () => {
+  const profile: Config = {
+    server_address: ($('server-address') as HTMLInputElement).value || '127.0.0.1:9092',
+    tun_name: ($('tun-name') as HTMLInputElement).value || 'stls-tun',
+    mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
+    auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
+    split_mode: 'exclude',
+    split_processes: [],
+    split_domains: [],
+  };
+  try {
+    await invoke('save_config', { config: profile });
+    addLog('Profile saved');
+  } catch (e: any) {
+    addLog('Save failed: ' + String(e));
+  }
 });
+
+// ── Save App Settings ──────────────────────────────────────────
+$('btn-save-app')?.addEventListener('click', async () => {
+  try {
+    await invoke('save_app_settings', {
+      language: ($('language') as HTMLSelectElement).value,
+      autoStart: ($('auto-start') as HTMLSelectElement).value === 'true',
+      minimizeTray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
+      notifyConnect: ($('notif-connect') as HTMLSelectElement).value === 'true',
+      pingInterval: parseInt(($('ping-interval') as HTMLInputElement).value) || 5,
+    });
+    addLog('App settings saved');
+  } catch (e: any) {
+    addLog('Save failed: ' + String(e));
+  }
+});
+
+// ── Save Split Tunnel ──────────────────────────────────────────
+$('btn-save-split')?.addEventListener('click', async () => {
+  const processes = ($('split-processes') as HTMLTextAreaElement).value
+    .split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  const domains = ($('split-domains') as HTMLTextAreaElement).value
+    .split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  try {
+    await invoke('save_split_rules', {
+      mode: ($('split-mode') as HTMLSelectElement).value,
+      processes,
+      domains,
+    });
+    addLog('Split rules saved');
+  } catch (e: any) {
+    addLog('Save failed: ' + String(e));
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────
+setupWindowControls();
+loadConfig();
+addLog('Application started');

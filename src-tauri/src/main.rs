@@ -347,7 +347,7 @@ fn real_ping(state: State<AppState>) -> Result<String, String> {
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("dakal-tls v5")
-        .inner_size(500.0, 520.0)
+        .inner_size(1020.0, 700.0)
         .resizable(true)
         .build()?;
     Ok(())
