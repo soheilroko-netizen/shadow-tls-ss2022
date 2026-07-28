@@ -21,6 +21,14 @@ pub struct Config {
     pub socks5_port: u16,
     #[serde(default)]
     pub mtu: Option<u32>,
+    #[serde(default = "default_encryption_method")]
+    pub encryption_method: String,
+    #[serde(default)]
+    pub split_mode: String,
+    #[serde(default)]
+    pub split_processes: Vec<String>,
+    #[serde(default)]
+    pub split_domains: Vec<String>,
     #[serde(default)]
     pub split_rules: Vec<SplitRule>,
 }
@@ -39,6 +47,7 @@ fn default_ss_port() -> u16 { 8380 }
 fn default_stls_port() -> u16 { 8553 }
 fn default_stls_sni() -> String { "dl.google.com".to_string() }
 fn default_socks5_port() -> u16 { 1080 }
+fn default_encryption_method() -> String { "chacha20-ietf-poly1305".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
@@ -63,6 +72,10 @@ impl Default for Config {
             stls_sni: "dl.google.com".to_string(),
             socks5_port: 1080,
             mtu: None,
+            encryption_method: "chacha20-ietf-poly1305".to_string(),
+            split_mode: "exclude".to_string(),
+            split_processes: vec![],
+            split_domains: vec![],
             split_rules: vec![],
         }
     }

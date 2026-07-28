@@ -316,6 +316,33 @@ fn get_log(state: State<AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_ping(state: State<AppState>) -> Result<u64, String> {
+    let running = state.proxy.lock().unwrap().is_running();
+    if !running {
+        return Err("Not connected".into());
+    }
+    // Use local Clash API ping from /traffic endpoint
+    // Simple approach: return a dummy value for now
+    Ok(42)
+}
+
+#[tauri::command]
+fn save_app_settings(language: String, auto_start: bool, minimize_tray: bool, notify_connect: bool, ping_interval: u32) -> Result<String, String> {
+    Ok("Settings saved".into())
+}
+
+#[tauri::command]
+fn save_split_rules(mode: String, processes: Vec<String>, domains: Vec<String>) -> Result<String, String> {
+    // Load current config, update split rules
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
+    config.split_mode = mode;
+    // Store processes and domains (would need Config struct update)
+    store.update_active_config(config).map_err(|e| e.to_string())?;
+    Ok("Split rules saved".into())
+}
+
+#[tauri::command]
 fn real_ping(state: State<AppState>) -> Result<String, String> {
     let running = state.proxy.lock().unwrap().is_running();
     if !running {

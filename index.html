@@ -14,13 +14,17 @@
 
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-inner">
-      <div class="profile-card" id="sidebar-profile">
+      <!-- Profile Selector -->
+      <div class="profile-selector" id="profile-selector">
         <div class="avatar">G</div>
         <div class="profile-info">
-          <div class="profile-name">Gaming</div>
+          <div class="profile-name" id="active-profile-name">Germany 1</div>
           <div class="profile-label">Active Profile</div>
         </div>
-        <div class="profile-arrow">▾</div>
+        <div class="profile-arrow" id="profile-arrow">▾</div>
+      </div>
+      <div class="profile-dropdown" id="profile-dropdown" style="display:none;">
+        <div class="dropdown-item" data-profile="Germany 1">Germany 1</div>
       </div>
 
       <nav class="nav">
@@ -34,7 +38,7 @@
         </div>
         <div class="nav-item" data-view="app-settings" id="nav-app-settings">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
-          <span>App Settings</span>
+          <span>Profile Settings</span>
         </div>
         <div class="nav-item" data-view="split-tunnel" id="nav-split-tunnel">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8-6a6 6 0 100 12 6 6 0 000-12z"/><path d="M10 6a1 1 0 011 1v3a1 1 0 01-1 1H7a1 1 0 110-2h2V7a1 1 0 011-1z"/></svg>
@@ -59,29 +63,18 @@
         <button class="win-btn win-max" id="win-max">□</button>
         <button class="win-btn win-close" id="win-close">✕</button>
       </div>
-      <div class="top-right-controls">
-        <div class="server-select" id="server-select">
-          <svg class="globe-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.34 6.5A7 7 0 0012 16.93V14a2 2 0 00-2-2H8v-2a1 1 0 00-1-1H5V7.5c0-.48.18-.93.34-1zm8.56-1.16A2 2 0 0011 4h-2a2 2 0 00-2 2v1h4v2a1 1 0 001 1h1v.5h1.4A6.98 6.98 0 0017 10a7 7 0 00-3.1-4.66z"/></svg>
-          <span id="server-name">Germany - Frankfurt</span>
-          <svg class="chevron-down" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/></svg>
-        </div>
-        <button class="settings-btn" id="btn-settings-quick">
-          <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
-        </button>
-      </div>
     </div>
 
     <div class="view active" id="view-dashboard">
-      <div class="planet-section">
-        <div class="planet-container" id="planet-container">
-          <img src="public/saturn.png" alt="Saturn" class="planet-img" id="planet-img">
-          <div class="planet-glow"></div>
-          <button class="planet-power-btn" id="btn-connect">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
+      <!-- Power button ring sits on Saturn in bg -->
+      <div class="planet-section" id="planet-section">
+        <div class="power-ring" id="power-ring">
+          <div class="ring-outer"></div>
+          <button class="power-btn" id="btn-connect">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
               <path d="M12 2v8m0 0a4 4 0 100 8 4 4 0 000-8zm-8 8a8 8 0 1116 0"/>
             </svg>
           </button>
-          <div class="planet-ring-glow" id="planet-ring-glow"></div>
         </div>
         <div class="status-section">
           <div class="status-badge" id="status-badge">
@@ -93,15 +86,16 @@
         </div>
       </div>
 
+      <!-- Ping Widget -->
       <div class="ping-widget" id="ping-widget">
         <div class="ping-header">
           <span class="ping-label">PING</span>
-          <span class="ping-tooltip">?</span>
         </div>
         <div class="ping-value" id="ping-value">—</div>
         <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
       </div>
 
+      <!-- Bottom Bar -->
       <div class="bottom-bar">
         <div class="stat-item">
           <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.34 6.5A7 7 0 0012 16.93V14a2 2 0 00-2-2H8v-2a1 1 0 00-1-1H5V7.5c0-.48.18-.93.34-1zm8.56-1.16A2 2 0 0011 4h-2a2 2 0 00-2 2v1h4v2a1 1 0 001 1h1v.5h1.4A6.98 6.98 0 0017 10a7 7 0 00-3.1-4.66z"/></svg>
@@ -132,6 +126,7 @@
       </div>
     </div>
 
+    <!-- Profile Settings View -->
     <div class="view" id="view-profile-settings">
       <div class="view-header">
         <button class="back-btn" data-view="dashboard">← Back</button>
@@ -140,19 +135,56 @@
       <div class="settings-form">
         <div class="form-group">
           <label>Profile Name</label>
-          <input type="text" id="profile-name-input" value="Gaming">
+          <input type="text" id="profile-name-input" value="Germany 1">
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Server Address</label>
+            <input type="text" id="server-address" placeholder="ns.baft.uk">
+          </div>
+          <div class="form-group half">
+            <label>Socks5 Port</label>
+            <input type="number" id="socks5-port" placeholder="1080" value="1080">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>SS Port</label>
+            <input type="number" id="ss-port" placeholder="8380" value="8380">
+          </div>
+          <div class="form-group half">
+            <label>SS Password</label>
+            <input type="password" id="ss-password" placeholder="SS password">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>ShadowTLS Port</label>
+            <input type="number" id="stls-port" placeholder="8553" value="8553">
+          </div>
+          <div class="form-group half">
+            <label>ShadowTLS Password</label>
+            <input type="password" id="stls-password" placeholder="STLS password">
+          </div>
         </div>
         <div class="form-group">
-          <label>Server Address</label>
-          <input type="text" id="server-address" placeholder="127.0.0.1:9092">
+          <label>ShadowTLS SNI</label>
+          <input type="text" id="stls-sni" placeholder="dl.google.com" value="dl.google.com">
         </div>
-        <div class="form-group">
-          <label>TUN Name</label>
-          <input type="text" id="tun-name" placeholder="stls-tun">
-        </div>
-        <div class="form-group">
-          <label>MTU</label>
-          <input type="number" id="mtu" placeholder="1500">
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Encryption Method</label>
+            <select id="encryption-method">
+              <option value="aes-256-gcm">AES-256-GCM</option>
+              <option value="chacha20-ietf-poly1305">ChaCha20-Poly1305</option>
+              <option value="aes-128-gcm">AES-128-GCM</option>
+              <option value="2022-blake3-aes-256-gcm">2022-Blake3-AES-256-GCM</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label>MTU</label>
+            <input type="number" id="mtu" placeholder="1500">
+          </div>
         </div>
         <div class="form-group">
           <label>Auto Connect</label>
@@ -165,6 +197,7 @@
       </div>
     </div>
 
+    <!-- App Settings View -->
     <div class="view" id="view-app-settings">
       <div class="view-header">
         <button class="back-btn" data-view="dashboard">← Back</button>
@@ -201,12 +234,13 @@
         </div>
         <div class="form-group">
           <label>Ping interval (seconds)</label>
-          <input type="number" id="ping-interval" value="5">
+          <input type="number" id="ping-interval" value="1">
         </div>
         <button class="btn-save" id="btn-save-app">Save Settings</button>
       </div>
     </div>
 
+    <!-- Split Tunnel View -->
     <div class="view" id="view-split-tunnel">
       <div class="view-header">
         <button class="back-btn" data-view="dashboard">← Back</button>
@@ -222,16 +256,19 @@
         </div>
         <div class="form-group">
           <label>Process Names (one per line)</label>
-          <textarea id="split-processes" rows="4" placeholder="chrome.exe&#10;firefox.exe"></textarea>
+          <textarea id="split-processes" rows="4" placeholder="chrome.exe
+firefox.exe"></textarea>
         </div>
         <div class="form-group">
           <label>Domain/IP Rules (one per line)</label>
-          <textarea id="split-domains" rows="4" placeholder="example.com&#10;192.168.1.0/24"></textarea>
+          <textarea id="split-domains" rows="4" placeholder="example.com
+192.168.1.0/24"></textarea>
         </div>
         <button class="btn-save" id="btn-save-split">Save Rules</button>
       </div>
     </div>
 
+    <!-- Log View -->
     <div class="view" id="view-log">
       <div class="view-header">
         <button class="back-btn" data-view="dashboard">← Back</button>

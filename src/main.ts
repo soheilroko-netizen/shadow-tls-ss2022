@@ -1,18 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-// ── Types ─────────────────────────────────────────────────────
-interface Profile {
-  name: string;
-  server_address: string;
-  tun_name: string;
-  mtu: number | null;
-  auto_connect: boolean;
-}
-
 interface Config {
   server_address: string;
-  tun_name: string;
+  ss_port: number;
+  ss_password: string;
+  stls_port: number;
+  stls_password: string;
+  stls_sni: string;
+  socks5_port: number;
   mtu: number | null;
   auto_connect: boolean;
   split_mode: string;
@@ -25,7 +21,6 @@ interface TrafficData {
   down: number;
 }
 
-// ── State ──────────────────────────────────────────────────────
 let connected = false;
 let connectStart = 0;
 let timerInterval: number | null = null;
@@ -35,10 +30,9 @@ let pingHistory: number[] = [];
 const MAX_PING_POINTS = 30;
 let logBuffer: string[] = [];
 
-// ── DOM refs ───────────────────────────────────────────────────
 const $ = (id: string) => document.getElementById(id)!;
 
-// ── View switching ─────────────────────────────────────────────
+// ── View switching ────────────────────────────────────────────
 function showView(viewName: string) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -48,7 +42,7 @@ function showView(viewName: string) {
   if (navItem) navItem.classList.add('active');
 }
 
-// ── Window controls ────────────────────────────────────────────
+// ── Window controls ───────────────────────────────────────────
 function setupWindowControls() {
   const win = getCurrentWindow();
   $('win-min')?.addEventListener('click', () => win.minimize());
@@ -56,7 +50,7 @@ function setupWindowControls() {
   $('win-close')?.addEventListener('click', () => win.close());
 }
 
-// ── Navigation ─────────────────────────────────────────────────
+// ── Navigation ────────────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', () => {
     const view = el.getAttribute('data-view');
@@ -68,43 +62,45 @@ document.querySelectorAll('.back-btn').forEach(el => {
   el.addEventListener('click', () => showView('dashboard'));
 });
 
-// ── Server select ──────────────────────────────────────────────
-$('server-select')?.addEventListener('click', async () => {
-  try {
-    const serversStr = await invoke<string>('get_servers');
-    const servers: string[] = JSON.parse(serversStr);
-    // Simple cycle through servers for now
-    const current = $('server-name').textContent;
-    const idx = servers.indexOf(current || '');
-    const next = idx >= 0 && idx < servers.length - 1 ? servers[idx + 1] : servers[0];
-    if (next) {
-      $('server-name').textContent = next;
-      await invoke('set_server', { server: next });
-    }
-  } catch { /* no server list available */ }
+// ── Profile Selector (top-left card) ──────────────────────────
+$('profile-selector')?.addEventListener('click', () => {
+  const dropdown = $('profile-dropdown');
+  dropdown.classList.toggle('show');
 });
 
-// ── Profile card ───────────────────────────────────────────────
-$('sidebar-profile')?.addEventListener('click', () => showView('profile-settings'));
+$('profile-dropdown')?.addEventListener('click', (e) => {
+  const item = (e.target as HTMLElement).closest('.dropdown-item');
+  if (!item) return;
+  const name = item.getAttribute('data-profile') || '';
+  $('active-profile-name').textContent = name;
+  $('profile-dropdown').classList.remove('show');
+  addLog('Switched profile: ' + name);
+});
 
-// ── Settings quick button ──────────────────────────────────────
-$('btn-settings-quick')?.addEventListener('click', () => showView('app-settings'));
+// Close dropdown on click outside
+document.addEventListener('click', (e) => {
+  const sel = $('profile-selector');
+  const dd = $('profile-dropdown');
+  if (sel && dd && !sel.contains(e.target as Node) && !dd.contains(e.target as Node)) {
+    dd.classList.remove('show');
+  }
+});
 
-// ── Connect / Disconnect ───────────────────────────────────────
+// ── Connect / Disconnect ──────────────────────────────────────
 $('btn-connect')?.addEventListener('click', async () => {
   if (!connected) {
     try {
-      await invoke('connect');
+      await invoke('start_proxy');
       connected = true;
       updateConnectionUI();
       startTimers();
-      addLog('Connected to server');
+      addLog('Connected');
     } catch (e: any) {
       addLog('Connection failed: ' + String(e));
     }
   } else {
     try {
-      await invoke('disconnect');
+      await invoke('stop_proxy');
       connected = false;
       updateConnectionUI();
       stopTimers();
@@ -119,7 +115,6 @@ function updateConnectionUI() {
   const main = document.querySelector('#main')!;
   main.classList.toggle('connected', connected);
   $('status-text').textContent = connected ? 'CONNECTED' : 'Disconnected';
-  $('status-dot').style.background = connected ? 'var(--green)' : 'var(--text-dim)';
 }
 
 function startTimers() {
@@ -137,6 +132,8 @@ function stopTimers() {
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
   $('stat-time').textContent = '00:00:00';
   $('timer').textContent = '00:00:00';
+  pingHistory = [];
+  drawPingGraph();
 }
 
 function updateTimer() {
@@ -150,11 +147,11 @@ function updateTimer() {
   $('stat-time').textContent = time;
 }
 
-// ── Traffic polling ────────────────────────────────────────────
+// ── Traffic polling (1s) ──────────────────────────────────────
 async function startTrafficPolling() {
   await pollTraffic();
   if (trafficInterval) clearInterval(trafficInterval);
-  trafficInterval = window.setInterval(pollTraffic, 3000);
+  trafficInterval = window.setInterval(pollTraffic, 1000);
 }
 
 async function pollTraffic() {
@@ -164,7 +161,7 @@ async function pollTraffic() {
     const upFmt = formatBytes(data.up);
     const downFmt = formatBytes(data.down);
     $('stat-traffic').textContent = `↑ ${upFmt} · ↓ ${downFmt}`;
-  } catch { /* ignore polling errors */ }
+  } catch { /* ignore */ }
 }
 
 function formatBytes(bytes: number): string {
@@ -174,11 +171,11 @@ function formatBytes(bytes: number): string {
   return (bytes / 1073741824).toFixed(2) + ' GB';
 }
 
-// ── Ping polling ───────────────────────────────────────────────
+// ── Ping polling (1s, requested) ──────────────────────────────
 async function startPingPolling() {
   await pollPing();
   if (pingInterval) clearInterval(pingInterval);
-  pingInterval = window.setInterval(pollPing, 5000);
+  pingInterval = window.setInterval(pollPing, 1000);
 }
 
 async function pollPing() {
@@ -187,8 +184,9 @@ async function pollPing() {
     const ping = await invoke<number>('get_ping');
     pingHistory.push(ping);
     if (pingHistory.length > MAX_PING_POINTS) pingHistory.shift();
-    const avg = pingHistory.reduce((a, b) => a + b, 0) / pingHistory.length;
-    $('ping-value').textContent = Math.round(avg) + ' ms';
+    // Show latest ping, not average
+    const latest = pingHistory[pingHistory.length - 1];
+    $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
   } catch { /* ignore */ }
 }
@@ -215,18 +213,17 @@ function drawPingGraph() {
   });
   ctx.stroke();
 
-  // Fill below line
   ctx.lineTo(w, h);
   ctx.lineTo(0, h);
   ctx.closePath();
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(34, 211, 238, 0.2)');
+  grad.addColorStop(0, 'rgba(34, 211, 238, 0.15)');
   grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
   ctx.fillStyle = grad;
   ctx.fill();
 }
 
-// ── Log ────────────────────────────────────────────────────────
+// ── Log ───────────────────────────────────────────────────────
 function addLog(msg: string) {
   const ts = new Date().toLocaleTimeString();
   logBuffer.push(`[${ts}] ${msg}`);
@@ -255,33 +252,36 @@ $('btn-clear-log')?.addEventListener('click', () => {
   renderLog();
 });
 
-// ── Load config on startup ─────────────────────────────────────
+// ── Load config ───────────────────────────────────────────────
 async function loadConfig() {
   try {
     const config = await invoke<Config>('get_config');
     if (config) {
       if (config.server_address) $('server-address').value = config.server_address;
-      if (config.tun_name) $('tun-name').value = config.tun_name;
+      ($('ss-port') as HTMLInputElement).value = String(config.ss_port || 8380);
+      if (config.ss_password) ($('ss-password') as HTMLInputElement).value = config.ss_password;
+      ($('stls-port') as HTMLInputElement).value = String(config.stls_port || 8553);
+      if (config.stls_password) ($('stls-password') as HTMLInputElement).value = config.stls_password;
+      if (config.stls_sni) $('stls-sni').value = config.stls_sni;
+      ($('socks5-port') as HTMLInputElement).value = String(config.socks5_port || 1080);
       if (config.mtu) ($('mtu') as HTMLInputElement).value = String(config.mtu);
       if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
-      if (config.split_mode) ($('split-mode') as HTMLSelectElement).value = config.split_mode;
-      if (config.split_processes) ($('split-processes') as HTMLTextAreaElement).value = config.split_processes.join('\n');
-      if (config.split_domains) ($('split-domains') as HTMLTextAreaElement).value = config.split_domains.join('\n');
-      // Show server in top bar
-      const addr = config.server_address || '';
-      const parts = addr.split(':');
-      $('server-name').textContent = parts.length > 1 ? `Server :${parts[1]}` : addr || 'Germany - Frankfurt';
-      $('server-location').textContent = config.server_address || '\u2014';
-      $('stat-server').textContent = config.server_address || '\u2014';
+      $('server-location').textContent = config.server_address || '—';
+      $('stat-server').textContent = config.server_address || '—';
     }
   } catch { /* config not available */ }
 }
 
-// ── Save Profile ───────────────────────────────────────────────
+// ── Save Profile ──────────────────────────────────────────────
 $('btn-save-profile')?.addEventListener('click', async () => {
-  const profile: Config = {
-    server_address: ($('server-address') as HTMLInputElement).value || '127.0.0.1:9092',
-    tun_name: ($('tun-name') as HTMLInputElement).value || 'stls-tun',
+  const config: Config = {
+    server_address: ($('server-address') as HTMLInputElement).value || 'ns.baft.uk',
+    ss_port: parseInt(($('ss-port') as HTMLInputElement).value) || 8380,
+    ss_password: ($('ss-password') as HTMLInputElement).value || '',
+    stls_port: parseInt(($('stls-port') as HTMLInputElement).value) || 8553,
+    stls_password: ($('stls-password') as HTMLInputElement).value || '',
+    stls_sni: ($('stls-sni') as HTMLInputElement).value || 'dl.google.com',
+    socks5_port: parseInt(($('socks5-port') as HTMLInputElement).value) || 1080,
     mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
     auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
     split_mode: 'exclude',
@@ -289,14 +289,14 @@ $('btn-save-profile')?.addEventListener('click', async () => {
     split_domains: [],
   };
   try {
-    await invoke('save_config', { config: profile });
+    await invoke('save_config', { config });
     addLog('Profile saved');
   } catch (e: any) {
     addLog('Save failed: ' + String(e));
   }
 });
 
-// ── Save App Settings ──────────────────────────────────────────
+// ── Save App Settings ─────────────────────────────────────────
 $('btn-save-app')?.addEventListener('click', async () => {
   try {
     await invoke('save_app_settings', {
@@ -304,7 +304,7 @@ $('btn-save-app')?.addEventListener('click', async () => {
       autoStart: ($('auto-start') as HTMLSelectElement).value === 'true',
       minimizeTray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
       notifyConnect: ($('notif-connect') as HTMLSelectElement).value === 'true',
-      pingInterval: parseInt(($('ping-interval') as HTMLInputElement).value) || 5,
+      pingInterval: parseInt(($('ping-interval') as HTMLInputElement).value) || 1,
     });
     addLog('App settings saved');
   } catch (e: any) {
@@ -312,7 +312,7 @@ $('btn-save-app')?.addEventListener('click', async () => {
   }
 });
 
-// ── Save Split Tunnel ──────────────────────────────────────────
+// ── Save Split Tunnel ─────────────────────────────────────────
 $('btn-save-split')?.addEventListener('click', async () => {
   const processes = ($('split-processes') as HTMLTextAreaElement).value
     .split('\n').map(s => s.trim()).filter(s => s.length > 0);
