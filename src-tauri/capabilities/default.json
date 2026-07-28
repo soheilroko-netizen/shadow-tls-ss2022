@@ -18,9 +18,7 @@
     "core:window:allow-set-decorations",
     "core:window:allow-set-resizable",
     "core:window:allow-start-dragging",
-    "core:window:allow-start-resizing",
-    "core:window:allow-theme-change",
-    "core:window:allow-close-requested",
+
     "core:event:default",
     "core:tray:default",
     "core:tray:allow-set-tooltip",
