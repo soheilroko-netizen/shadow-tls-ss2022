@@ -11,14 +11,25 @@ interface Config {
   socks5_port: number;
   mtu: number | null;
   auto_connect: boolean;
+  encryption_method: string;
   split_mode: string;
   split_processes: string[];
   split_domains: string[];
 }
 
-interface TrafficData {
+interface TradefaceTrafficData {
   up: number;
   down: number;
+}
+
+interface ProfileData {
+  name: string;
+  config: Config;
+}
+
+interface ProfileStoreData {
+  profiles: ProfileData[];
+  active_profile: string;
 }
 
 let connected = false;
@@ -27,7 +38,7 @@ let timerInterval: number | null = null;
 let trafficInterval: number | null = null;
 let pingInterval: number | null = null;
 let pingHistory: number[] = [];
-const MAX_PING_POINTS = 30;
+const MAX_PING_POINTS = 100;
 let logBuffer: string[] = [];
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -40,14 +51,8 @@ function showView(viewName: string) {
   if (view) view.classList.add('active');
   const navItem = document.getElementById('nav-' + viewName);
   if (navItem) navItem.classList.add('active');
-}
-
-// ── Window controls ───────────────────────────────────────────
-function setupWindowControls() {
-  const win = getCurrentWindow();
-  $('win-min')?.addEventListener('click', () => win.minimize());
-  $('win-max')?.addEventListener('click', () => win.toggleMaximize());
-  $('win-close')?.addEventListener('click', () => win.close());
+  // Refresh profiles when entering profile settings
+  if (viewName === 'profile-settings') loadProfilesList();
 }
 
 // ── Navigation ────────────────────────────────────────────────
@@ -62,19 +67,10 @@ document.querySelectorAll('.back-btn').forEach(el => {
   el.addEventListener('click', () => showView('dashboard'));
 });
 
-// ── Profile Selector (top-left card) ──────────────────────────
+// ── Profile Selector (sidebar top) ────────────────────────────
 $('profile-selector')?.addEventListener('click', () => {
   const dropdown = $('profile-dropdown');
   dropdown.classList.toggle('show');
-});
-
-$('profile-dropdown')?.addEventListener('click', (e) => {
-  const item = (e.target as HTMLElement).closest('.dropdown-item');
-  if (!item) return;
-  const name = item.getAttribute('data-profile') || '';
-  $('active-profile-name').textContent = name;
-  $('profile-dropdown').classList.remove('show');
-  addLog('Switched profile: ' + name);
 });
 
 // Close dropdown on click outside
@@ -85,6 +81,34 @@ document.addEventListener('click', (e) => {
     dd.classList.remove('show');
   }
 });
+
+async function loadProfilesDropdown() {
+  try {
+    const store = await invoke<ProfileStoreData>('get_profiles');
+    const dd = $('profile-dropdown');
+    if (!dd) return;
+    dd.innerHTML = store.profiles.map(p =>
+      `<div class="dropdown-item" data-profile="${p.name}">${p.name}</div>`
+    ).join('');
+    $('active-profile-name').textContent = store.active_profile;
+    // Bind click on new items
+    dd.querySelectorAll('.dropdown-item').forEach(item => {
+      item.addEventListener('click', async () => {
+        const name = item.getAttribute('data-profile') || '';
+        try {
+          await invoke('switch_profile', { name });
+          $('active-profile-name').textContent = name;
+          dd.classList.remove('show');
+          addLog('Switched to: ' + name);
+          loadConfig();
+          loadProfilesList();
+        } catch (e: any) {
+          addLog('Switch failed: ' + String(e));
+        }
+      });
+    });
+  } catch { /* ignore */ }
+}
 
 // ── Connect / Disconnect ──────────────────────────────────────
 $('btn-connect')?.addEventListener('click', async () => {
@@ -157,10 +181,11 @@ async function startTrafficPolling() {
 async function pollTraffic() {
   if (!connected) return;
   try {
-    const data = await invoke<TrafficData>('get_total_traffic');
+    const raw = await invoke<string>('get_total_traffic');
+    const data = JSON.parse(raw) as TradefaceTrafficData;
     const upFmt = formatBytes(data.up);
     const downFmt = formatBytes(data.down);
-    $('stat-traffic').textContent = `↑ ${upFmt} · ↓ ${downFmt}`;
+    $('stat-traffic').textContent = `\u2191 ${upFmt} \u00b7 \u2193 ${downFmt}`;
   } catch { /* ignore */ }
 }
 
@@ -171,7 +196,7 @@ function formatBytes(bytes: number): string {
   return (bytes / 1073741824).toFixed(2) + ' GB';
 }
 
-// ── Ping polling (1s, requested) ──────────────────────────────
+// ── Ping polling (1s) ─────────────────────────────────────────
 async function startPingPolling() {
   await pollPing();
   if (pingInterval) clearInterval(pingInterval);
@@ -184,7 +209,6 @@ async function pollPing() {
     const ping = await invoke<number>('get_ping');
     pingHistory.push(ping);
     if (pingHistory.length > MAX_PING_POINTS) pingHistory.shift();
-    // Show latest ping, not average
     const latest = pingHistory[pingHistory.length - 1];
     $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
@@ -226,7 +250,7 @@ function drawPingGraph() {
 // ── Log ───────────────────────────────────────────────────────
 function addLog(msg: string) {
   const ts = new Date().toLocaleTimeString();
-  logBuffer.push(`[${ts}] ${msg}`);
+  logBuffer.push(`${ts} ${msg}`);
   renderLog();
 }
 
@@ -252,7 +276,7 @@ $('btn-clear-log')?.addEventListener('click', () => {
   renderLog();
 });
 
-// ── Load config ───────────────────────────────────────────────
+// ── Load & Save Config ────────────────────────────────────────
 async function loadConfig() {
   try {
     const config = await invoke<Config>('get_config');
@@ -266,13 +290,13 @@ async function loadConfig() {
       ($('socks5-port') as HTMLInputElement).value = String(config.socks5_port || 1080);
       if (config.mtu) ($('mtu') as HTMLInputElement).value = String(config.mtu);
       if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
-      $('server-location').textContent = config.server_address || '—';
-      $('stat-server').textContent = config.server_address || '—';
+      if (config.encryption_method) ($('encryption-method') as HTMLSelectElement).value = config.encryption_method;
+      $('server-location').textContent = config.server_address || '\u2014';
+      $('stat-server').textContent = config.server_address || '\u2014';
     }
   } catch { /* config not available */ }
 }
 
-// ── Save Profile ──────────────────────────────────────────────
 $('btn-save-profile')?.addEventListener('click', async () => {
   const config: Config = {
     server_address: ($('server-address') as HTMLInputElement).value || 'ns.baft.uk',
@@ -284,6 +308,7 @@ $('btn-save-profile')?.addEventListener('click', async () => {
     socks5_port: parseInt(($('socks5-port') as HTMLInputElement).value) || 1080,
     mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
     auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
+    encryption_method: ($('encryption-method') as HTMLSelectElement).value || 'chacha20-ietf-poly1305',
     split_mode: 'exclude',
     split_processes: [],
     split_domains: [],
@@ -291,10 +316,62 @@ $('btn-save-profile')?.addEventListener('click', async () => {
   try {
     await invoke('save_config', { config });
     addLog('Profile saved');
+    loadProfilesDropdown();
   } catch (e: any) {
     addLog('Save failed: ' + String(e));
   }
 });
+
+// ── Add / Delete Profile ──────────────────────────────────────
+$('btn-add-profile')?.addEventListener('click', async () => {
+  const nameInput = $('profile-name-input') as HTMLInputElement;
+  const name = nameInput.value.trim();
+  if (!name) { addLog('Enter a profile name first'); return; }
+  const config: Config = {
+    server_address: ($('server-address') as HTMLInputElement).value || 'ns.baft.uk',
+    ss_port: parseInt(($('ss-port') as HTMLInputElement).value) || 8380,
+    ss_password: ($('ss-password') as HTMLInputElement).value || '',
+    stls_port: parseInt(($('stls-port') as HTMLInputElement).value) || 8553,
+    stls_password: ($('stls-password') as HTMLInputElement).value || '',
+    stls_sni: ($('stls-sni') as HTMLInputElement).value || 'dl.google.com',
+    socks5_port: parseInt(($('socks5-port') as HTMLInputElement).value) || 1080,
+    mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
+    auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
+    encryption_method: ($('encryption-method') as HTMLSelectElement).value || 'chacha20-ietf-poly1305',
+    split_mode: 'exclude',
+    split_processes: [],
+    split_domains: [],
+  };
+  try {
+    await invoke('add_profile', { name, config });
+    addLog('Profile created: ' + name);
+    loadProfilesDropdown();
+    loadProfilesList();
+  } catch (e: any) {
+    addLog('Create failed: ' + String(e));
+  }
+});
+
+$('btn-delete-profile')?.addEventListener('click', async () => {
+  const name = ($('profile-name-input') as HTMLInputElement).value.trim();
+  if (!name) { addLog('No profile name to delete'); return; }
+  try {
+    await invoke('delete_profile', { name });
+    addLog('Deleted: ' + name);
+    loadProfilesDropdown();
+    loadProfilesList();
+  } catch (e: any) {
+    addLog('Delete failed: ' + String(e));
+  }
+});
+
+async function loadProfilesList() {
+  try {
+    const store = await invoke<ProfileStoreData>('get_profiles');
+    // Update profile name input to active
+    $('profile-name-input').value = store.active_profile;
+  } catch { /* ignore */ }
+}
 
 // ── Save App Settings ─────────────────────────────────────────
 $('btn-save-app')?.addEventListener('click', async () => {
@@ -330,7 +407,15 @@ $('btn-save-split')?.addEventListener('click', async () => {
   }
 });
 
+// ── Select/dropdown color fix ─────────────────────────────────
+// Fix white-on-white dropdown issue by setting CSS on select elements
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('select').forEach(sel => {
+    sel.style.color = '#fff';
+  });
+});
+
 // ── Init ───────────────────────────────────────────────────────
-setupWindowControls();
 loadConfig();
+loadProfilesDropdown();
 addLog('Application started');

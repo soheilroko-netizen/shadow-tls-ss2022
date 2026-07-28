@@ -21,10 +21,9 @@
           <div class="profile-name" id="active-profile-name">Germany 1</div>
           <div class="profile-label">Active Profile</div>
         </div>
-        <div class="profile-arrow" id="profile-arrow">▾</div>
+        <div class="profile-arrow" id="profile-arrow">&#x25be;</div>
       </div>
-      <div class="profile-dropdown" id="profile-dropdown" style="display:none;">
-        <div class="dropdown-item" data-profile="Germany 1">Germany 1</div>
+      <div class="profile-dropdown" id="profile-dropdown">
       </div>
 
       <nav class="nav">
@@ -57,22 +56,15 @@
   </aside>
 
   <main id="main">
-    <div class="top-bar">
-      <div class="window-controls" id="window-controls">
-        <button class="win-btn win-min" id="win-min">─</button>
-        <button class="win-btn win-max" id="win-max">□</button>
-        <button class="win-btn win-close" id="win-close">✕</button>
-      </div>
-    </div>
-
     <div class="view active" id="view-dashboard">
-      <!-- Power button ring sits on Saturn in bg -->
+      <!-- Power ring centered on planet -->
       <div class="planet-section" id="planet-section">
         <div class="power-ring" id="power-ring">
-          <div class="ring-outer"></div>
           <button class="power-btn" id="btn-connect">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
-              <path d="M12 2v8m0 0a4 4 0 100 8 4 4 0 000-8zm-8 8a8 8 0 1116 0"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="24" height="24">
+              <!-- Classic power icon: circle with vertical line -->
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 4v8"/>
             </svg>
           </button>
         </div>
@@ -81,7 +73,7 @@
             <span class="status-dot" id="status-dot"></span>
             <span id="status-text">Disconnected</span>
           </div>
-          <div class="server-location" id="server-location">—</div>
+          <div class="server-location" id="server-location">&#x2014;</div>
           <div class="timer" id="timer">00:00:00</div>
         </div>
       </div>
@@ -91,7 +83,7 @@
         <div class="ping-header">
           <span class="ping-label">PING</span>
         </div>
-        <div class="ping-value" id="ping-value">—</div>
+        <div class="ping-value" id="ping-value">&#x2014;</div>
         <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
       </div>
 
@@ -101,7 +93,7 @@
           <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.34 6.5A7 7 0 0012 16.93V14a2 2 0 00-2-2H8v-2a1 1 0 00-1-1H5V7.5c0-.48.18-.93.34-1zm8.56-1.16A2 2 0 0011 4h-2a2 2 0 00-2 2v1h4v2a1 1 0 001 1h1v.5h1.4A6.98 6.98 0 0017 10a7 7 0 00-3.1-4.66z"/></svg>
           <div class="stat-labels">
             <div class="stat-title">CURRENT SERVER</div>
-            <div class="stat-value" id="stat-server">—</div>
+            <div class="stat-value" id="stat-server">&#x2014;</div>
           </div>
           <div class="signal-bars">
             <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div><div class="bar b4"></div><div class="bar b5"></div>
@@ -120,7 +112,7 @@
           <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z"/></svg>
           <div class="stat-labels">
             <div class="stat-title">DATA USAGE</div>
-            <div class="stat-value" id="stat-traffic">↑ 0 B · ↓ 0 B</div>
+            <div class="stat-value" id="stat-traffic">&#x2191; 0 B &#xb7; &#x2193; 0 B</div>
           </div>
         </div>
       </div>
@@ -129,7 +121,7 @@
     <!-- Profile Settings View -->
     <div class="view" id="view-profile-settings">
       <div class="view-header">
-        <button class="back-btn" data-view="dashboard">← Back</button>
+        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
         <h2>Profile Settings</h2>
       </div>
       <div class="settings-form">
@@ -190,17 +182,21 @@
           <label>Auto Connect</label>
           <select id="auto-connect">
             <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="false" selected>Disabled</option>
           </select>
         </div>
-        <button class="btn-save" id="btn-save-profile">Save Profile</button>
+        <div class="profile-actions">
+          <button class="btn-save" id="btn-save-profile">Save Profile</button>
+          <button class="btn-add" id="btn-add-profile">+ Add Profile</button>
+          <button class="btn-delete" id="btn-delete-profile">Delete</button>
+        </div>
       </div>
     </div>
 
     <!-- App Settings View -->
     <div class="view" id="view-app-settings">
       <div class="view-header">
-        <button class="back-btn" data-view="dashboard">← Back</button>
+        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
         <h2>App Settings</h2>
       </div>
       <div class="settings-form">
@@ -208,14 +204,14 @@
           <label>Language</label>
           <select id="language">
             <option value="en">English</option>
-            <option value="fa">فارسی</option>
+            <option value="fa">&#x641;&#x627;&#x631;&#x633;&#x6CC;</option>
           </select>
         </div>
         <div class="form-group">
           <label>Auto-start on boot</label>
           <select id="auto-start">
             <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+            <option value="false" selected>Disabled</option>
           </select>
         </div>
         <div class="form-group">
@@ -243,7 +239,7 @@
     <!-- Split Tunnel View -->
     <div class="view" id="view-split-tunnel">
       <div class="view-header">
-        <button class="back-btn" data-view="dashboard">← Back</button>
+        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
         <h2>Split Tunnel</h2>
       </div>
       <div class="split-tunnel-panel">
@@ -271,7 +267,7 @@ firefox.exe"></textarea>
     <!-- Log View -->
     <div class="view" id="view-log">
       <div class="view-header">
-        <button class="back-btn" data-view="dashboard">← Back</button>
+        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
         <h2>Connection Log</h2>
         <button class="btn-clear-log" id="btn-clear-log">Clear</button>
       </div>

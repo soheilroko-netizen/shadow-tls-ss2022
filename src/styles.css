@@ -8,7 +8,7 @@
 
 :root {
   --sidebar-w: 170px;
-  --glass-bg: rgba(8, 12, 25, 0.25);
+  --glass-bg: rgba(8, 12, 25, 0.08);
   --glass-border: rgba(255, 255, 255, 0.05);
   --glass-hover: rgba(255, 255, 255, 0.06);
   --glass-active: rgba(100, 180, 255, 0.1);
@@ -264,9 +264,9 @@ html, body {
   align-items: center;
   gap: 6px;
   position: absolute;
-  top: 50%;
+  top: 42%;
   left: 50%;
-  transform: translate(-50%, -58%);
+  transform: translate(-50%, -55%);
 }
 
 /* Power ring - sits on Saturn in bg image */
@@ -294,6 +294,21 @@ html, body {
   box-shadow: 0 0 20px rgba(74, 222, 128, 0.15);
 }
 
+.power-ring::before {
+  content: '';
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255,255,255,0.25);
+  pointer-events: none;
+  transition: all 0.3s;
+}
+.connected .power-ring::before {
+  border-color: rgba(74, 222, 128, 0.6);
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.2);
+}
+
 .power-btn {
   position: absolute;
   z-index: 3;
@@ -301,7 +316,7 @@ html, body {
   height: 50px;
   border-radius: 50%;
   border: none;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45);
   backdrop-filter: blur(4px);
   color: rgba(255,255,255,0.5);
   cursor: pointer;
@@ -312,7 +327,7 @@ html, body {
 }
 .power-btn:hover {
   color: var(--accent);
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.55);
 }
 .connected .power-btn {
   color: var(--green);
@@ -368,7 +383,7 @@ html, body {
   position: absolute;
   bottom: 70px;
   right: 16px;
-  background: rgba(8, 12, 25, 0.2);
+  background: rgba(8, 12, 25, 0.05);
   backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
@@ -411,7 +426,7 @@ html, body {
   right: 0;
   display: flex;
   align-items: center;
-  background: rgba(8, 12, 25, 0.2);
+  background: rgba(8, 12, 25, 0.08);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--glass-border);
   padding: 8px 16px;
@@ -590,6 +605,42 @@ html, body {
 }
 .btn-save:hover, .btn-clear-log:hover {
   opacity: 0.8;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-add {
+  background: rgba(100, 180, 255, 0.15);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.btn-add:hover {
+  background: rgba(100, 180, 255, 0.25);
+}
+
+.btn-delete {
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  color: #ff6464;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.btn-delete:hover {
+  background: rgba(255, 80, 80, 0.2);
 }
 
 .btn-clear-log {
