@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface Config {
   server_address: string;
@@ -39,8 +38,11 @@ let trafficInterval: number | null = null;
 let pingInterval: number | null = null;
 let pingHistory: number[] = [];
 let lastTraffic: TrafficData | null = null;
-const MAX_PING_POINTS = 100;
+let cumulativeStart: TrafficData | null = null;
+let firstCumulative: TrafficData | null = null;
+const MAX_PING_POINTS = 50;
 let logBuffer: string[] = [];
+let switching = false;
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -98,45 +100,43 @@ async function loadProfilesDropdown() {
   } catch { /* ignore */ }
 }
 
-// ── Switch profile + auto-connect ─────────────────────────────
 async function switchAndConnect(name: string) {
+  if (switching) return;
+  switching = true;
   try {
+    if (connected) {
+      await invoke('stop_proxy');
+      connected = false;
+      updateConnectionUI();
+      stopTimers();
+    }
     await invoke('switch_profile', { name });
     $('active-profile-name').textContent = name;
     addLog('Switched to: ' + name);
     loadConfig();
     loadProfilesList();
-
-    // If currently connected, reconnect to new profile
-    if (connected) {
-      // Disconnect first
+    // Auto-connect to new profile
+    setTimeout(async () => {
       try {
-        await invoke('stop_proxy');
-        connected = false;
+        await invoke('start_proxy');
+        connected = true;
         updateConnectionUI();
-        stopTimers();
-      } catch {}
-
-      // Wait a beat then reconnect
-      setTimeout(async () => {
-        try {
-          await invoke('start_proxy');
-          connected = true;
-          updateConnectionUI();
-          startTimers();
-          addLog('Auto-connected: ' + name);
-        } catch (e: any) {
-          addLog('Auto-connect failed: ' + String(e));
-        }
-      }, 500);
-    }
+        startTimers();
+        addLog('Auto-connected: ' + name);
+      } catch (e: any) {
+        addLog('Auto-connect failed: ' + String(e));
+      }
+      switching = false;
+    }, 300);
   } catch (e: any) {
     addLog('Switch failed: ' + String(e));
+    switching = false;
   }
 }
 
 // ── Connect / Disconnect ──────────────────────────────────────
 $('btn-connect')?.addEventListener('click', async () => {
+  if (switching) return;
   if (!connected) {
     try {
       await invoke('start_proxy');
@@ -179,12 +179,15 @@ function stopTimers() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   if (trafficInterval) { clearInterval(trafficInterval); trafficInterval = null; }
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-  $('stat-time').textContent = '00:00:00';
+  $('info-time').textContent = '00:00:00';
   $('timer').textContent = '00:00:00';
   pingHistory = [];
   lastTraffic = null;
+  cumulativeStart = null;
+  firstCumulative = null;
   drawPingGraph();
-  $('stat-traffic').textContent = '↑ 0 B · ↓ 0 B';
+  $('usage-live').textContent = '↑ 0 B · ↓ 0 B';
+  $('usage-total').textContent = '↑ 0 B · ↓ 0 B';
 }
 
 function updateTimer() {
@@ -195,33 +198,41 @@ function updateTimer() {
   const s = String(elapsed % 60).padStart(2, '0');
   const time = `${h}:${m}:${s}`;
   $('timer').textContent = time;
-  $('stat-time').textContent = time;
+  $('info-time').textContent = time;
 }
 
-// ── Traffic: per-second (live), not cumulative ────────────────
+// ── Traffic (live + cumulative) ───────────────────────────────
 async function startTrafficPolling() {
   lastTraffic = null;
-  await pollTrafficLive();
+  cumulativeStart = null;
+  firstCumulative = null;
+  await pollTrafficAll();
   if (trafficInterval) clearInterval(trafficInterval);
-  trafficInterval = window.setInterval(pollTrafficLive, 1000);
+  trafficInterval = window.setInterval(pollTrafficAll, 2000);
 }
 
-async function pollTrafficLive() {
+async function pollTrafficAll() {
   if (!connected) return;
   try {
     const raw = await invoke<string>('get_total_traffic');
     const data = JSON.parse(raw) as TrafficData;
 
+    // Cumulative total (from connection start)
+    if (!firstCumulative) {
+      firstCumulative = { up: data.up, down: data.down };
+    }
+    const totalUp = Math.max(0, data.up - firstCumulative.up);
+    const totalDown = Math.max(0, data.down - firstCumulative.down);
+    $('usage-total').textContent = `↑ ${formatBytes(totalUp)} · ↓ ${formatBytes(totalDown)}`;
+
+    // Live (per-second delta)
     if (lastTraffic) {
-      // Delta: per-second rate
-      const upDelta = data.up - lastTraffic.up;
-      const downDelta = data.down - lastTraffic.down;
-      // Clamp to non-negative
-      const up = Math.max(0, upDelta);
-      const down = Math.max(0, downDelta);
-      const upFmt = formatBytes(up);
-      const downFmt = formatBytes(down);
-      $('stat-traffic').textContent = `↑ ${upFmt} · ↓ ${downFmt}`;
+      const upDelta = Math.max(0, data.up - lastTraffic.up);
+      const downDelta = Math.max(0, data.down - lastTraffic.down);
+      // Since we poll every 2s, divide by 2 for per-second rate
+      const up = Math.round(upDelta / 2);
+      const down = Math.round(downDelta / 2);
+      $('usage-live').textContent = `↑ ${formatBytes(up)} · ↓ ${formatBytes(down)}`;
     }
     lastTraffic = data;
   } catch { /* ignore */ }
@@ -238,7 +249,7 @@ function formatBytes(bytes: number): string {
 async function startPingPolling() {
   await pollPing();
   if (pingInterval) clearInterval(pingInterval);
-  pingInterval = window.setInterval(pollPing, 1000);
+  pingInterval = window.setInterval(pollPing, 2000);
 }
 
 async function pollPing() {
@@ -250,9 +261,7 @@ async function pollPing() {
     const latest = pingHistory[pingHistory.length - 1];
     $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
-  } catch (e) {
-    // Don't spam logs, just keep trying
-  }
+  } catch { /* keep trying silently */ }
 }
 
 function drawPingGraph() {
@@ -277,11 +286,12 @@ function drawPingGraph() {
   });
   ctx.stroke();
 
+  // Fill gradient
   ctx.lineTo(w, h);
   ctx.lineTo(0, h);
   ctx.closePath();
   const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(34, 211, 238, 0.15)');
+  grad.addColorStop(0, 'rgba(34, 211, 238, 0.12)');
   grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
   ctx.fillStyle = grad;
   ctx.fill();
@@ -332,9 +342,10 @@ async function loadConfig() {
       if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
       if (config.encryption_method) ($('encryption-method') as HTMLSelectElement).value = config.encryption_method;
       $('server-location').textContent = config.server_address || '—';
-      $('stat-server').textContent = config.server_address || '—';
+      $('info-server').innerHTML = (config.server_address || '—') +
+        '<span class="signal-bars"><div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div><div class="bar b4"></div><div class="bar b5"></div></span>';
     }
-  } catch { /* config not available */ }
+  } catch { /* ignore */ }
 }
 
 $('btn-save-profile')?.addEventListener('click', async () => {
@@ -362,7 +373,6 @@ $('btn-save-profile')?.addEventListener('click', async () => {
   }
 });
 
-// ── Add / Delete Profile ──────────────────────────────────────
 $('btn-add-profile')?.addEventListener('click', async () => {
   const nameInput = $('profile-name-input') as HTMLInputElement;
   const name = nameInput.value.trim();
@@ -412,15 +422,14 @@ async function loadProfilesList() {
   } catch { /* ignore */ }
 }
 
-// ── Save App Settings ─────────────────────────────────────────
 $('btn-save-app')?.addEventListener('click', async () => {
   try {
     await invoke('save_app_settings', {
       language: ($('language') as HTMLSelectElement).value,
-      autoStart: ($('auto-start') as HTMLSelectElement).value === 'true',
-      minimizeTray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
-      notifyConnect: ($('notif-connect') as HTMLSelectElement).value === 'true',
-      pingInterval: parseInt(($('ping-interval') as HTMLInputElement).value) || 1,
+      auto_start: ($('auto-start') as HTMLSelectElement).value === 'true',
+      minimize_tray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
+      notify_connect: ($('notif-connect') as HTMLSelectElement).value === 'true',
+      ping_interval: parseInt(($('ping-interval') as HTMLInputElement).value) || 1,
     });
     addLog('App settings saved');
   } catch (e: any) {
@@ -428,7 +437,6 @@ $('btn-save-app')?.addEventListener('click', async () => {
   }
 });
 
-// ── Save Split Tunnel ─────────────────────────────────────────
 $('btn-save-split')?.addEventListener('click', async () => {
   const processes = ($('split-processes') as HTMLTextAreaElement).value
     .split('\n').map(s => s.trim()).filter(s => s.length > 0);
@@ -444,13 +452,6 @@ $('btn-save-split')?.addEventListener('click', async () => {
   } catch (e: any) {
     addLog('Save failed: ' + String(e));
   }
-});
-
-// ── Fix white select text ─────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('select').forEach(sel => {
-    sel.style.color = '#fff';
-  });
 });
 
 // ── Init ───────────────────────────────────────────────────────

@@ -14,7 +14,6 @@
 
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-inner">
-      <!-- Profile Selector -->
       <div class="profile-selector" id="profile-selector">
         <div class="avatar">G</div>
         <div class="profile-info">
@@ -23,8 +22,7 @@
         </div>
         <div class="profile-arrow" id="profile-arrow">&#x25be;</div>
       </div>
-      <div class="profile-dropdown" id="profile-dropdown">
-      </div>
+      <div class="profile-dropdown" id="profile-dropdown"></div>
 
       <nav class="nav">
         <div class="nav-item active" data-view="dashboard" id="nav-dashboard">
@@ -33,10 +31,6 @@
         </div>
         <div class="nav-item" data-view="profile-settings" id="nav-profile-settings">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16z"/></svg>
-          <span>Profile Settings</span>
-        </div>
-        <div class="nav-item" data-view="app-settings" id="nav-app-settings">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
           <span>Profile Settings</span>
         </div>
         <div class="nav-item" data-view="split-tunnel" id="nav-split-tunnel">
@@ -57,15 +51,16 @@
 
   <main id="main">
     <div class="view active" id="view-dashboard">
-      <!-- Power ring centered on planet -->
-      <div class="planet-section" id="planet-section">
-        <div class="power-ring" id="power-ring">
-          <button class="power-btn" id="btn-connect">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="28" height="28">
+      <!-- Power button centered in main area (window - sidebar) -->
+      <div class="power-center" id="power-center">
+        <button class="power-btn" id="btn-connect">
+          <div class="power-ring" id="power-ring"></div>
+          <div class="power-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="28" height="28">
               <path d="M12 3v9m-6.5-6A8 8 0 1119 6"/>
             </svg>
-          </button>
-        </div>
+          </div>
+        </button>
         <div class="status-section">
           <div class="status-badge" id="status-badge">
             <span class="status-dot" id="status-dot"></span>
@@ -76,42 +71,30 @@
         </div>
       </div>
 
-      <!-- Ping Widget -->
-      <div class="ping-widget" id="ping-widget">
-        <div class="ping-header">
-          <span class="ping-label">PING</span>
+      <!-- Widget: Ping + Usage combined -->
+      <div class="widgets-stack" id="widgets-stack">
+        <!-- Usage Widget (on top of ping) -->
+        <div class="usage-widget" id="usage-widget">
+          <div class="widget-label">LIVE</div>
+          <div class="usage-live" id="usage-live">&#x2191; 0 B &#xB7; &#x2193; 0 B</div>
+          <div class="widget-label" style="margin-top:4px;">TOTAL</div>
+          <div class="usage-total" id="usage-total">&#x2191; 0 B &#xB7; &#x2193; 0 B</div>
         </div>
-        <div class="ping-value" id="ping-value">&#x2014;</div>
-        <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
-      </div>
 
-      <!-- Bottom Bar -->
-      <div class="bottom-bar">
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.34 6.5A7 7 0 0012 16.93V14a2 2 0 00-2-2H8v-2a1 1 0 00-1-1H5V7.5c0-.48.18-.93.34-1zm8.56-1.16A2 2 0 0011 4h-2a2 2 0 00-2 2v1h4v2a1 1 0 001 1h1v.5h1.4A6.98 6.98 0 0017 10a7 7 0 00-3.1-4.66z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">CURRENT SERVER</div>
-            <div class="stat-value" id="stat-server">&#x2014;</div>
+        <!-- Ping Widget -->
+        <div class="ping-widget" id="ping-widget">
+          <div class="ping-header">
+            <span class="ping-label">PING</span>
           </div>
-          <div class="signal-bars">
-            <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div><div class="bar b4"></div><div class="bar b5"></div>
-          </div>
+          <div class="ping-value" id="ping-value">&#x2014;</div>
+          <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">CONNECTED TIME</div>
-            <div class="stat-value" id="stat-time">00:00:00</div>
-          </div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">DATA USAGE</div>
-            <div class="stat-value" id="stat-traffic">&#x2191; 0 B &#xb7; &#x2193; 0 B</div>
-          </div>
+
+        <!-- Bottom info bar (single line: server + time) -->
+        <div class="info-bar" id="info-bar">
+          <span id="info-server" class="info-server">&#x2014;</span>
+          <span class="info-sep">&#xB7;</span>
+          <span id="info-time" class="info-time">00:00:00</span>
         </div>
       </div>
     </div>
@@ -250,13 +233,11 @@
         </div>
         <div class="form-group">
           <label>Process Names (one per line)</label>
-          <textarea id="split-processes" rows="4" placeholder="chrome.exe
-firefox.exe"></textarea>
+          <textarea id="split-processes" rows="4" placeholder="chrome.exe&#10;firefox.exe"></textarea>
         </div>
         <div class="form-group">
           <label>Domain/IP Rules (one per line)</label>
-          <textarea id="split-domains" rows="4" placeholder="example.com
-192.168.1.0/24"></textarea>
+          <textarea id="split-domains" rows="4" placeholder="example.com&#10;192.168.1.0/24"></textarea>
         </div>
         <button class="btn-save" id="btn-save-split">Save Rules</button>
       </div>

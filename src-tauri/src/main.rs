@@ -321,9 +321,23 @@ fn get_ping(state: State<AppState>) -> Result<u64, String> {
     if !running {
         return Err("Not connected".into());
     }
-    // Use local Clash API ping from /traffic endpoint
-    // Simple approach: return a dummy value for now
-    Ok(42)
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+
+    let target = "http://www.gstatic.com/generate_204";
+
+    let start = Instant::now();
+    let resp = client.get(target).send().map_err(|e| format!("http get: {e}"))?;
+    if !resp.status().is_success() && resp.status().as_u16() != 204 {
+        return Err(format!("bad status: {}", resp.status()));
+    }
+    let elapsed = start.elapsed();
+
+    let ms = (elapsed.as_micros() as f64 / 1000.0) as u64;
+    Ok(ms)
 }
 
 #[tauri::command]
