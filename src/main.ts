@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface Config {
   server_address: string;
@@ -12,401 +12,247 @@ interface Config {
   mtu: number | null;
   split_rules: SplitRule[];
 }
+interface SplitRule { pattern: string; }
+interface Profile { name: string; config: Config; }
+interface ProfileStore { profiles: Profile[]; active_profile: string; }
 
-interface SplitRule {
-  pattern: string;
+const WIN_MAIN = { w: 800, h: 500 };
+const WIN_SETTINGS = { w: 600, h: 750 };
+
+async function setSize(w: number, h: number) {
+  try { await getCurrentWindow().setSize({ type: 'Logical', width: w, height: h }); } catch {}
 }
 
-interface Profile {
-  name: string;
-  config: Config;
-}
+let currentView = 'main';
 
-interface ProfileStore {
-  profiles: Profile[];
-  active_profile: string;
-}
-
-const MAIN_W = 500,
-  MAIN_H = 560;
-const SETTINGS_W = 560,
-  SETTINGS_H = 720;
-
-async function setWindowSize(w: number, h: number) {
-  try {
-    await getCurrentWindow().setSize({ type: 'Logical', width: w, height: h });
-  } catch {
-    /* ignore */
+function showView(name: string) {
+  document.querySelectorAll('.view').forEach(v => (v as HTMLElement).style.display = 'none');
+  const el = document.getElementById('view-' + name);
+  if (el) {
+    el.style.display = 'flex';
+    (el as HTMLElement).classList.add('active');
   }
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navBtn = document.querySelector('.nav-item[data-view="' + name + '"]');
+  if (navBtn) navBtn.classList.add('active');
+  currentView = name;
+  if (name === 'main') setSize(WIN_MAIN.w, WIN_MAIN.h);
+  else setSize(WIN_SETTINGS.w, WIN_SETTINGS.h);
 }
 
-async function showMainView() {
-  document.getElementById('main-view')!.style.display = 'block';
-  document.getElementById('settings-view')!.style.display = 'none';
-  await setWindowSize(MAIN_W, MAIN_H);
-  updateServerInfo();
-  loadMainProfiles();
-}
+// ── Connection ───────────────────────────────────────────
 
-async function showSettingsView() {
-  document.getElementById('main-view')!.style.display = 'none';
-  document.getElementById('settings-view')!.style.display = 'block';
-  await setWindowSize(SETTINGS_W, SETTINGS_H);
-  loadProfiles();
-}
+let connected = false;
 
-async function updateServerInfo() {
+async function updateStatus() {
   try {
-    const config = await invoke<Config>('get_config');
-    document.getElementById('server-value')!.textContent = `${config.server_address}:${config.stls_port}`;
-  } catch {
-    /* ignore */
-  }
+    const running = await invoke<boolean>('get_status');
+    connected = running;
+    const badge = document.getElementById('status-badge')!;
+    const txt = document.getElementById('status-text')!;
+    const planet = document.getElementById('planet-icon')!;
+    if (running) {
+      badge.className = 'status-badge connected';
+      txt.textContent = 'Connected';
+      planet.classList.add('connected');
+    } else {
+      badge.className = 'status-badge disconnected';
+      txt.textContent = 'Disconnected';
+      planet.classList.remove('connected');
+    }
+  } catch {}
 }
+
+async function toggleConnect() {
+  if (connected) {
+    try { await invoke('stop_proxy'); } catch {}
+  } else {
+    try { await invoke('start_proxy'); } catch {}
+  }
+  await updateStatus();
+  if (connected) setTimeout(doPing, 1500);
+}
+
+// ── Ping ─────────────────────────────────────────────────
 
 async function doPing() {
   try {
-    const pingEl = document.getElementById('ping-value')!;
-    pingEl.textContent = 'Pinging...';
+    const el = document.getElementById('ping-value')!;
+    el.textContent = '...';
     const ms = await invoke<string>('real_ping');
-    pingEl.textContent = ms;
-  } catch (err) {
+    el.textContent = ms;
+  } catch {
     document.getElementById('ping-value')!.textContent = 'TIMEOUT';
   }
 }
 
+// ── Server info ──────────────────────────────────────────
+
+async function updateServerInfo() {
+  try {
+    const config = await invoke<Config>('get_config');
+    const name = config.server_address + ':' + config.stls_port;
+    document.getElementById('server-name')!.textContent = name;
+    document.getElementById('bottom-server')!.textContent = name;
+  } catch {}
+}
+
+function formatBytes(b: number): string {
+  if (b === 0) return '0';
+  if (b < 1024) return b + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
+  return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+}
+
+async function updateTraffic() {
+  try {
+    const raw = await invoke<string>('get_traffic');
+    const v = JSON.parse(raw);
+    document.getElementById('bottom-traffic')!.textContent = '\u2191 ' + formatBytes(v.up) + '  \u2193 ' + formatBytes(v.down);
+  } catch {}
+}
+
+function pad(n: number) { return n.toString().padStart(2, '0'); }
+
 async function updateUptime() {
   try {
     const secs = await invoke<number>('get_uptime');
-    const el = document.getElementById('uptime-value')!;
+    const el = document.getElementById('timer')!;
+    const bottomEl = document.getElementById('bottom-uptime')!;
     if (secs === 0) {
-      el.textContent = '-';
+      el.textContent = '00:00';
+      bottomEl.textContent = '00:00';
       return;
     }
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = secs % 60;
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    if (h > 0) {
-      el.textContent = `${h}:${pad(m)}:${pad(s)}`;
-    } else {
-      el.textContent = `${m}:${pad(s)}`;
-    }
-  } catch {
-    /* ignore */
-  }
+    const t = h > 0 ? h + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+    el.textContent = t;
+    bottomEl.textContent = t;
+  } catch {}
 }
 
-function formatBytes(b: number): string {
-  if (b === 0) return '0';
-  if (b < 1024) return `${b} B`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-async function updateTraffic() {
-  const el = document.getElementById('traffic-value')!;
-  try {
-    const raw = await invoke<string>('get_traffic');
-    const v = JSON.parse(raw);
-    const up = formatBytes(v.up);
-    const down = formatBytes(v.down);
-    el.textContent = `↑ ${up}  ↓ ${down}`;
-  } catch {
-    el.textContent = '↑ 0  ↓ 0';
-  }
-}
-
-async function updateTotalTraffic() {
-  const el = document.getElementById('total-traffic-value')!;
-  try {
-    const raw = await invoke<string>('get_total_traffic');
-    const v = JSON.parse(raw);
-    const up = formatBytes(v.up);
-    const down = formatBytes(v.down);
-    el.textContent = `↑ ${up}  ↓ ${down}`;
-  } catch {
-    el.textContent = '↑ 0  ↓ 0';
-  }
-}
-
-async function updateStatus() {
-  try {
-    const isRunning = await invoke<boolean>('get_status');
-    const statusDot = document.getElementById('status-dot')!;
-    const statusText = document.getElementById('status-text')!;
-    const btnStart = document.getElementById('btn-start') as HTMLButtonElement;
-    const btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
-
-    if (isRunning) {
-      statusDot.classList.add('connected');
-      statusText.textContent = 'Connected';
-      btnStart.disabled = true;
-      btnStop.disabled = false;
-    } else {
-      statusDot.classList.remove('connected');
-      statusText.textContent = 'Disconnected';
-      btnStart.disabled = false;
-      btnStop.disabled = true;
-    }
-  } catch (err) {
-    showMessage('Error checking status: ' + err, 'error');
-  }
-}
-
-async function startProxy() {
-  try {
-    const msg = await invoke<string>('start_proxy');
-    showMessage(msg, 'success');
-    await updateStatus();
-    // Auto ping after connect
-    setTimeout(doPing, 1500);
-  } catch (err) {
-    showMessage('Failed to start: ' + err, 'error');
-  }
-}
-
-async function stopProxy() {
-  try {
-    const msg = await invoke<string>('stop_proxy');
-    showMessage(msg, 'success');
-    await updateStatus();
-  } catch (err) {
-    showMessage('Failed to stop: ' + err, 'error');
-  }
-}
-
-function showMessage(text: string, type: 'success' | 'error') {
-  const msgEl = document.getElementById('message')!;
-  msgEl.textContent = text;
-  msgEl.className = `message ${type}`;
-  setTimeout(() => {
-    msgEl.textContent = '';
-    msgEl.className = 'message';
-  }, 5000);
-}
-
-// ── Main view profile selector ─────────────────────────────────
-
-async function loadMainProfiles() {
-  try {
-    const store = await invoke<ProfileStore>('get_profiles');
-    const select = document.getElementById('main-profile-select') as HTMLSelectElement;
-    const current = select.value;
-    select.innerHTML = '';
-    store.profiles.forEach((p) => {
-      const opt = document.createElement('option');
-      opt.value = p.name;
-      opt.textContent = p.name;
-      select.appendChild(opt);
-    });
-    if (current && store.profiles.some((p) => p.name === current)) {
-      select.value = current;
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
-async function mainProfileChanged() {
-  const select = document.getElementById('main-profile-select') as HTMLSelectElement;
-  const name = select.value;
-  if (!name) return;
-  try {
-    await invoke('switch_profile_stop', { name });
-    // Re-read config for updated server info
-    updateServerInfo();
-    updateStatus();
-    showMessage(`Switched to '${name}'`, 'success');
-  } catch (err) {
-    showMessage('Switch failed: ' + err, 'error');
-  }
-}
-
-// ── Settings functions ─────────────────────────────────────────
+// ── Profile management ───────────────────────────────────
 
 async function loadProfiles() {
   try {
     const store = await invoke<ProfileStore>('get_profiles');
-    const select = document.getElementById('profile-select') as HTMLSelectElement;
-    select.innerHTML = '';
-
-    store.profiles.forEach((profile) => {
-      const option = document.createElement('option');
-      option.value = profile.name;
-      option.textContent = profile.name;
-      if (profile.name === store.active_profile) {
-        option.selected = true;
-      }
-      select.appendChild(option);
+    const selects = ['sidebar-profile-select', 'server-profile-select', 'settings-profile-select'];
+    selects.forEach(id => {
+      const sel = document.getElementById(id) as HTMLSelectElement;
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '';
+      store.profiles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name;
+        sel.appendChild(opt);
+      });
+      if (cur && store.profiles.some(p => p.name === cur)) sel.value = cur;
     });
-
-    await loadConfig();
-  } catch (err) {
-    showSettingsMessage('Failed to load profiles: ' + err, 'error');
-  }
+  } catch {}
 }
+
+async function profileChanged(id: string) {
+  const sel = document.getElementById(id) as HTMLSelectElement;
+  const name = sel.value;
+  if (!name) return;
+  try {
+    await invoke('switch_profile_stop', { name });
+    // sync all selects
+    const others = ['sidebar-profile-select', 'server-profile-select', 'settings-profile-select'].filter(x => x !== id);
+    others.forEach(oid => {
+      const osel = document.getElementById(oid) as HTMLSelectElement;
+      if (osel) osel.value = name;
+    });
+    updateServerInfo();
+    updateStatus();
+  } catch {}
+}
+
+// ── Settings ─────────────────────────────────────────────
 
 async function loadConfig() {
   try {
     const config = await invoke<Config>('get_config');
-    (document.getElementById('server_address') as HTMLInputElement).value =
-      config.server_address;
-    (document.getElementById('ss_port') as HTMLInputElement).value =
-      config.ss_port.toString();
-    (document.getElementById('ss_password') as HTMLInputElement).value =
-      config.ss_password;
-    (document.getElementById('stls_port') as HTMLInputElement).value =
-      config.stls_port.toString();
-    (document.getElementById('stls_password') as HTMLInputElement).value =
-      config.stls_password;
-    (document.getElementById('stls_sni') as HTMLInputElement).value =
-      config.stls_sni;
-    (document.getElementById('socks5_port') as HTMLInputElement).value =
-      config.socks5_port.toString();
-    (document.getElementById('mtu') as HTMLInputElement).value =
-      config.mtu ? config.mtu.toString() : '';
-    (document.getElementById('split_rules') as HTMLTextAreaElement).value =
-      config.split_rules.map((r) => r.pattern).join('\n');
-  } catch (err) {
-    showSettingsMessage('Failed to load config: ' + err, 'error');
-  }
+    (document.getElementById('server_address') as HTMLInputElement).value = config.server_address;
+    (document.getElementById('ss_port') as HTMLInputElement).value = config.ss_port.toString();
+    (document.getElementById('ss_password') as HTMLInputElement).value = config.ss_password;
+    (document.getElementById('stls_port') as HTMLInputElement).value = config.stls_port.toString();
+    (document.getElementById('stls_password') as HTMLInputElement).value = config.stls_password;
+    (document.getElementById('stls_sni') as HTMLInputElement).value = config.stls_sni;
+    (document.getElementById('socks5_port') as HTMLInputElement).value = config.socks5_port.toString();
+    (document.getElementById('mtu') as HTMLInputElement).value = config.mtu ? config.mtu.toString() : '';
+    (document.getElementById('split_rules_view') as HTMLTextAreaElement).value = config.split_rules.map(r => r.pattern).join('\\n');
+  } catch {}
 }
 
-async function saveConfig(event: Event) {
-  event.preventDefault();
-
+async function saveConfig(e: Event) {
+  e.preventDefault();
   const mtuRaw = (document.getElementById('mtu') as HTMLInputElement).value;
-  const mtuVal = mtuRaw ? parseInt(mtuRaw) : null;
-  const splitRaw = (document.getElementById('split_rules') as HTMLTextAreaElement).value;
-  const splitRules = splitRaw
-    .split('\n')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((s) => ({ pattern: s }));
-
   const config: Config = {
-    server_address: (
-      document.getElementById('server_address') as HTMLInputElement
-    ).value,
-    ss_port: parseInt(
-      (document.getElementById('ss_port') as HTMLInputElement).value
-    ),
-    ss_password: (
-      document.getElementById('ss_password') as HTMLInputElement
-    ).value,
-    stls_port: parseInt(
-      (document.getElementById('stls_port') as HTMLInputElement).value
-    ),
-    stls_password: (
-      document.getElementById('stls_password') as HTMLInputElement
-    ).value,
+    server_address: (document.getElementById('server_address') as HTMLInputElement).value,
+    ss_port: parseInt((document.getElementById('ss_port') as HTMLInputElement).value),
+    ss_password: (document.getElementById('ss_password') as HTMLInputElement).value,
+    stls_port: parseInt((document.getElementById('stls_port') as HTMLInputElement).value),
+    stls_password: (document.getElementById('stls_password') as HTMLInputElement).value,
     stls_sni: (document.getElementById('stls_sni') as HTMLInputElement).value,
-    socks5_port: parseInt(
-      (document.getElementById('socks5_port') as HTMLInputElement).value
-    ),
-    mtu: mtuVal,
-    split_rules: splitRules,
+    socks5_port: parseInt((document.getElementById('socks5_port') as HTMLInputElement).value),
+    mtu: mtuRaw ? parseInt(mtuRaw) : null,
+    split_rules: [],
   };
-
+  // Re-read split_rules from settings form if available
+  const splitEl = document.getElementById('split_rules') as HTMLTextAreaElement;
+  if (splitEl) {
+    config.split_rules = splitEl.value.split('\\n').map(s => s.trim()).filter(s => s.length > 0).map(s => ({ pattern: s }));
+  }
   try {
     await invoke('save_config', { config });
-    showSettingsMessage('Settings saved successfully!', 'success');
-    setTimeout(() => showMainView(), 1500);
+    showMsg('settings-message', 'Saved!', 'success');
+    updateServerInfo();
   } catch (err) {
-    showSettingsMessage('Failed to save: ' + err, 'error');
-  }
-}
-
-async function switchProfile() {
-  const select = document.getElementById('profile-select') as HTMLSelectElement;
-  const profileName = select.value;
-
-  try {
-    await invoke('switch_profile', { name: profileName });
-    await loadConfig();
-    showSettingsMessage('Switched to ' + profileName, 'success');
-  } catch (err) {
-    showSettingsMessage('Failed to switch: ' + err, 'error');
+    showMsg('settings-message', 'Failed: ' + err, 'error');
   }
 }
 
 async function newProfile() {
-  const name = prompt('Enter profile name:');
-  if (!name || name.trim() === '') return;
-
-  const mtuRaw = (document.getElementById('mtu') as HTMLInputElement).value;
-  const mtuVal = mtuRaw ? parseInt(mtuRaw) : null;
-  const splitRaw = (document.getElementById('split_rules') as HTMLTextAreaElement).value;
-  const splitRules = splitRaw
-    .split('\n')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((s) => ({ pattern: s }));
-
-  const config: Config = {
-    server_address: (
-      document.getElementById('server_address') as HTMLInputElement
-    ).value,
-    ss_port: parseInt(
-      (document.getElementById('ss_port') as HTMLInputElement).value
-    ),
-    ss_password: (
-      document.getElementById('ss_password') as HTMLInputElement
-    ).value,
-    stls_port: parseInt(
-      (document.getElementById('stls_port') as HTMLInputElement).value
-    ),
-    stls_password: (
-      document.getElementById('stls_password') as HTMLInputElement
-    ).value,
-    stls_sni: (document.getElementById('stls_sni') as HTMLInputElement).value,
-    socks5_port: parseInt(
-      (document.getElementById('socks5_port') as HTMLInputElement).value
-    ),
-    mtu: mtuVal,
-    split_rules: splitRules,
-  };
-
+  const name = prompt('Profile name:');
+  if (!name || !name.trim()) return;
   try {
-    await invoke('add_profile', { name: name.trim(), config });
+    await invoke('add_profile', { name: name.trim(), config: await invoke<Config>('get_config') });
     await loadProfiles();
-    showSettingsMessage('Profile created!', 'success');
+    showMsg('settings-message', 'Created!', 'success');
   } catch (err) {
-    showSettingsMessage('Failed to create: ' + err, 'error');
+    showMsg('settings-message', 'Failed: ' + err, 'error');
   }
 }
 
 async function deleteProfile() {
-  const select = document.getElementById('profile-select') as HTMLSelectElement;
-  const profileName = select.value;
-
-  if (profileName === 'Default') {
-    showSettingsMessage('Cannot delete Default profile', 'error');
-    return;
-  }
-
-  if (!confirm(`Delete profile "${profileName}"?`)) return;
-
+  const sel = document.getElementById('settings-profile-select') as HTMLSelectElement;
+  const name = sel.value;
+  if (name === 'Default') { showMsg('settings-message', 'Cannot delete Default', 'error'); return; }
+  if (!confirm('Delete "' + name + '"?')) return;
   try {
-    await invoke('delete_profile', { name: profileName });
+    await invoke('delete_profile', { name });
     await loadProfiles();
-    showSettingsMessage('Profile deleted', 'success');
+    showMsg('settings-message', 'Deleted', 'success');
   } catch (err) {
-    showSettingsMessage('Failed to delete: ' + err, 'error');
+    showMsg('settings-message', 'Failed: ' + err, 'error');
   }
 }
 
-// ── Log viewer ────────────────────────────────────────────────
-
-async function showLogView() {
-  document.getElementById('main-view')!.style.display = 'none';
-  document.getElementById('settings-view')!.style.display = 'none';
-  document.getElementById('log-view')!.style.display = 'block';
-  await setWindowSize(560, 500);
-  refreshLog();
+function showMsg(id: string, text: string, type: 'success' | 'error') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  setTimeout(() => { el.textContent = ''; el.className = 'msg'; }, 3000);
 }
+
+// ── Log ──────────────────────────────────────────────────
 
 async function refreshLog() {
   try {
@@ -417,17 +263,7 @@ async function refreshLog() {
   }
 }
 
-function showSettingsMessage(text: string, type: 'success' | 'error') {
-  const msgEl = document.getElementById('settings-message')!;
-  msgEl.textContent = text;
-  msgEl.className = `message ${type}`;
-  setTimeout(() => {
-    msgEl.textContent = '';
-    msgEl.className = 'message';
-  }, 3000);
-}
-
-// ── Polling loop for traffic + uptime ──────────────────────────
+// ── Polling ──────────────────────────────────────────────
 
 let polling = false;
 async function startPolling() {
@@ -435,66 +271,61 @@ async function startPolling() {
   polling = true;
   while (polling) {
     try {
-      const running = await invoke<boolean>('get_status');
-      if (running) {
+      if (await invoke<boolean>('get_status')) {
         await updateTraffic();
-        await updateTotalTraffic();
         await updateUptime();
-      } else {
-        document.getElementById('traffic-value')!.textContent = '↑ 0  ↓ 0';
-        document.getElementById('total-traffic-value')!.textContent = '↑ 0  ↓ 0';
-        document.getElementById('uptime-value')!.textContent = '-';
       }
-    } catch {
-      /* ignore */
-    }
-    await new Promise((r) => setTimeout(r, 2000));
+    } catch {}
+    await new Promise(r => setTimeout(r, 2000));
   }
 }
 
-function stopPolling() {
-  polling = false;
-}
+// ── DOM Ready ─────────────────────────────────────────────
 
-// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('btn-start')?.addEventListener('click', startProxy);
-  document.getElementById('btn-stop')?.addEventListener('click', stopProxy);
-  document
-    .getElementById('btn-main-settings')
-    ?.addEventListener('click', showSettingsView);
-  document
-    .getElementById('btn-main-log')
-    ?.addEventListener('click', showLogView);
-  document.getElementById('btn-back')?.addEventListener('click', showMainView);
-  document
-    .getElementById('btn-back-from-log')
-    ?.addEventListener('click', showMainView);
-  document
-    .getElementById('btn-refresh-log')
-    ?.addEventListener('click', refreshLog);
-  document
-    .getElementById('btn-ping')
-    ?.addEventListener('click', doPing);
-  document
-    .getElementById('main-profile-select')
-    ?.addEventListener('change', mainProfileChanged);
+  // Nav
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.addEventListener('click', () => showView((el as HTMLElement).dataset.view!));
+  });
+  document.querySelectorAll('.back-btn').forEach(el => {
+    el.addEventListener('click', () => showView((el as HTMLElement).dataset.view!));
+  });
 
-  document
-    .getElementById('settings-form')
-    ?.addEventListener('submit', saveConfig);
-  document
-    .getElementById('profile-select')
-    ?.addEventListener('change', switchProfile);
-  document
-    .getElementById('btn-new-profile')
-    ?.addEventListener('click', newProfile);
-  document
-    .getElementById('btn-delete-profile')
-    ?.addEventListener('click', deleteProfile);
+  // Connect
+  document.getElementById('planet-icon')!.addEventListener('click', toggleConnect);
 
+  // Profile selects
+  ['sidebar-profile-select', 'server-profile-select'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => profileChanged(id));
+  });
+  document.getElementById('settings-profile-select')?.addEventListener('change', () => {
+    loadConfig();
+  });
+
+  // Settings
+  document.getElementById('settings-form')?.addEventListener('submit', saveConfig);
+  document.getElementById('btn-new-profile')?.addEventListener('click', newProfile);
+  document.getElementById('btn-delete-profile')?.addEventListener('click', deleteProfile);
+  document.getElementById('btn-settings-quick')?.addEventListener('click', () => showView('settings'));
+  document.getElementById('btn-refresh-log')?.addEventListener('click', refreshLog);
+
+  // Split tunnel save
+  document.getElementById('btn-split-save')?.addEventListener('click', async () => {
+    const ta = document.getElementById('split_rules_view') as HTMLTextAreaElement;
+    if (!ta) return;
+    try {
+      const config = await invoke<Config>('get_config');
+      config.split_rules = ta.value.split('\\n').map(s => s.trim()).filter(s => s.length > 0).map(s => ({ pattern: s }));
+      await invoke('save_config', { config });
+      showMsg('split-msg', 'Split rules saved!', 'success');
+    } catch (err) {
+      showMsg('split-msg', 'Failed: ' + err, 'error');
+    }
+  });
+
+  // Init
   updateServerInfo();
-  loadMainProfiles();
+  loadProfiles();
   updateStatus();
   setInterval(updateStatus, 2000);
   startPolling();

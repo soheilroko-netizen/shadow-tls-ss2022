@@ -1,157 +1,215 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>dakal-tls v5</title>
-    <link rel="stylesheet" href="/src/styles.css" />
-  </head>
-  <body>
-    <div id="app">
-      <!-- Main View -->
-      <div id="main-view" class="container">
-        <h1>shado v5</h1>
-        <p class="subtitle">ShadowTLS + Shadowsocks VPN</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dakal-tls</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="app">
 
-        <!-- Profile selector -->
-        <div class="profile-bar-main">
-          <select id="main-profile-select" class="profile-select">
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div id="profile-card" class="profile-card">
+        <div class="profile-avatar">🎮</div>
+        <div class="profile-info">
+          <select id="sidebar-profile-select" class="profile-select">
             <option value="Default">Default</option>
           </select>
-          <button id="btn-main-settings" class="btn-small">Settings</button>
-          <button id="btn-main-log" class="btn-small">Log</button>
+          <span class="profile-label">Active Profile</span>
         </div>
-
-        <div class="status-card">
-          <div class="status-indicator" id="status-dot"></div>
-          <span id="status-text">Disconnected</span>
-        </div>
-
-        <div class="server-info">
-          <div class="info-row">
-            <span class="label">Server:</span>
-            <span class="value" id="server-value">-</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Ping:</span>
-            <span class="value" id="ping-value">
-              <button id="btn-ping" class="ping-btn">Ping</button>
-            </span>
-          </div>
-          <div class="info-row">
-            <span class="label">Uptime:</span>
-            <span class="value" id="uptime-value">-</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Traffic (current):</span>
-            <span class="value" id="traffic-value">↑ 0 ↓ 0</span>
-          </div>
-          <div class="info-row">
-            <span class="label">Traffic (total):</span>
-            <span class="value" id="total-traffic-value">↑ 0 ↓ 0</span>
-          </div>
-        </div>
-
-        <div class="controls">
-          <button id="btn-start" class="btn btn-primary">Start</button>
-          <button id="btn-stop" class="btn btn-secondary" disabled>Stop</button>
-        </div>
-
-        <div id="message" class="message"></div>
       </div>
 
-      <!-- Settings View (hidden by default) -->
-      <div id="settings-view" class="container" style="display: none">
-        <h1>Settings</h1>
-        <p class="subtitle">Configure Server Connection</p>
+      <nav id="nav">
+        <button class="nav-item active" data-view="main">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          Dashboard
+        </button>
+        <button class="nav-item" data-view="settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Profile Settings
+        </button>
+        <button class="nav-item" data-view="split-tunnel">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4h14V3"/><path d="M5 21v-4h14v4"/><path d="M5 7v10"/><path d="M19 7v10"/></svg>
+          Split Tunnel
+        </button>
+        <button class="nav-item" data-view="log">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Log
+        </button>
+      </nav>
 
-        <div style="margin-bottom: 20px">
-          <label for="profile-select" style="display: block; margin-bottom: 8px; font-weight: 500"
-            >Profile:</label
-          >
-          <div style="display: flex; gap: 8px">
-            <select
-              id="profile-select"
-              style="flex: 1; padding: 8px; border: 1px solid #444; background: #2a2a2a; color: #e0e0e0; border-radius: 4px"
-            >
+      <div id="sidebar-footer">
+        <span class="version">dakal-tls v5</span>
+      </div>
+    </aside>
+
+    <!-- MAIN VIEWPORT -->
+    <main id="view-main" class="view active">
+      <div id="stars"></div>
+      <div id="nebula"></div>
+
+      <div id="connection-center">
+        <div id="planet-icon" class="planet">
+          <div class="planet-ring"></div>
+          <svg id="power-btn" class="power-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <div id="status-badge" class="status-badge disconnected">
+          <span class="status-dot"></span>
+          <span id="status-text">Disconnected</span>
+        </div>
+        <div id="server-name">—</div>
+        <div id="timer">00:00</div>
+      </div>
+
+      <div id="top-right">
+        <div id="server-pill" class="pill">
+          <span class="dot dot-blue"></span>
+          <select id="server-profile-select" class="mini-select">
+            <option>Default</option>
+          </select>
+        </div>
+        <button id="btn-settings-quick" class="icon-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <div id="ping-widget" class="widget">
+        <div class="widget-label">PING</div>
+        <div id="ping-value" class="widget-value">0 ms</div>
+        <div id="ping-graph" class="ping-graph">
+          <svg width="100%" height="30" viewBox="0 0 80 30">
+            <polyline fill="none" stroke="#00e5ff" stroke-width="1.5" points="0,25 10,20 20,22 30,15 40,18 50,10 60,12 70,5 80,8"/>
+          </svg>
+        </div>
+      </div>
+
+      <div id="bottom-bar">
+        <div class="metric">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div>
+            <span class="metric-label">CURRENT SERVER</span>
+            <span id="bottom-server" class="metric-value">—</span>
+          </div>
+        </div>
+        <div class="metric">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div>
+            <span class="metric-label">CONNECTED TIME</span>
+            <span id="bottom-uptime" class="metric-value">00:00</span>
+          </div>
+        </div>
+        <div class="metric">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <div>
+            <span class="metric-label">DATA USAGE</span>
+            <span id="bottom-traffic" class="metric-value">↑ 0  ↓ 0</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- SETTINGS VIEW -->
+    <div id="view-settings" class="view">
+      <div class="view-header">
+        <button class="back-btn" data-view="main">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2>Profile Settings</h2>
+      </div>
+      <div class="view-body">
+        <div class="form-card">
+          <div class="profile-manage">
+            <select id="settings-profile-select" class="settings-select">
               <option value="Default">Default</option>
             </select>
-            <button type="button" id="btn-new-profile" class="btn btn-secondary" style="padding: 8px 16px">New</button>
-            <button type="button" id="btn-delete-profile" class="btn btn-secondary" style="padding: 8px 16px">
-              Delete
-            </button>
+            <button type="button" id="btn-new-profile" class="btn-sm">New</button>
+            <button type="button" id="btn-delete-profile" class="btn-sm btn-danger">Delete</button>
           </div>
         </div>
 
-        <form id="settings-form">
+        <form id="settings-form" class="form-card">
           <div class="form-group">
             <label for="server_address">Server Address</label>
             <input type="text" id="server_address" name="server_address" placeholder="ns.baft.uk" required />
           </div>
-
-          <div class="form-group">
-            <label for="ss_port">Shadowsocks Port</label>
-            <input type="number" id="ss_port" name="ss_port" placeholder="8380" min="1" max="65535" required />
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ss_port">SS Port</label>
+              <input type="number" id="ss_port" name="ss_port" placeholder="8380" min="1" max="65535" required />
+            </div>
+            <div class="form-group">
+              <label for="stls_port">STLS Port</label>
+              <input type="number" id="stls_port" name="stls_port" placeholder="8553" min="1" max="65535" required />
+            </div>
           </div>
-
           <div class="form-group">
-            <label for="ss_password">Shadowsocks Password</label>
+            <label for="ss_password">SS Password</label>
             <input type="password" id="ss_password" name="ss_password" placeholder="tE+3/qlN/..." required />
           </div>
-
           <div class="form-group">
-            <label for="stls_port">ShadowTLS Port</label>
-            <input type="number" id="stls_port" name="stls_port" placeholder="8553" min="1" max="65535" required />
-          </div>
-
-          <div class="form-group">
-            <label for="stls_password">ShadowTLS Password</label>
+            <label for="stls_password">STLS Password</label>
             <input type="password" id="stls_password" name="stls_password" placeholder="y2lachetore" required />
           </div>
-
           <div class="form-group">
-            <label for="stls_sni">ShadowTLS SNI (Server Name)</label>
+            <label for="stls_sni">SNI</label>
             <input type="text" id="stls_sni" name="stls_sni" placeholder="dl.google.com" required />
           </div>
-
-          <div class="form-group">
-            <label for="socks5_port">SOCKS5 Local Port</label>
-            <input type="number" id="socks5_port" name="socks5_port" placeholder="1080" min="1" max="65535" required />
-          </div>
-
-          <div class="form-group">
-            <label for="mtu">MTU (leave empty for default 1500)</label>
-            <input type="number" id="mtu" name="mtu" placeholder="1500" min="1280" max="9000" />
-          </div>
-
-          <div class="form-group">
-            <label for="split_rules">Split Tunneling — domains to route directly (one per line)</label>
-            <div style="font-size: 12px; color: #888; margin-bottom: 6px">
-              Patterns: <code>*.example.com</code> (suffix), <code>example.com</code> (exact), <code>*keyword*</code> (keyword)
+          <div class="form-row">
+            <div class="form-group">
+              <label for="socks5_port">SOCKS5 Port</label>
+              <input type="number" id="socks5_port" name="socks5_port" placeholder="1080" min="1" max="65535" required />
             </div>
-            <textarea id="split_rules" name="split_rules" rows="4" placeholder="*.ir&#10;aparat.com&#10;divar.ir" style="width: 100%; padding: 8px; border: 1px solid #444; background: #2a2a2a; color: #e0e0e0; border-radius: 4px; font-family: monospace; resize: vertical"></textarea>
+            <div class="form-group">
+              <label for="mtu">MTU</label>
+              <input type="number" id="mtu" name="mtu" placeholder="1500" min="1280" max="9000" />
+            </div>
           </div>
-
-          <div class="controls">
-            <button type="submit" class="btn btn-primary">Save</button>
-            <button type="button" id="btn-back" class="btn btn-secondary">Back</button>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Save</button>
           </div>
-
-          <div id="settings-message" class="message"></div>
+          <div id="settings-message" class="msg"></div>
         </form>
       </div>
+    </div>
 
-      <!-- Log Viewer View -->
-      <div id="log-view" class="container" style="display: none">
-        <h1>Connection Log</h1>
-        <p class="subtitle">sing-box runtime logs</p>
-        <div class="controls">
-          <button type="button" id="btn-refresh-log" class="btn btn-secondary">Refresh</button>
-          <button type="button" id="btn-back-from-log" class="btn btn-secondary">Back</button>
+    <!-- SPLIT TUNNEL VIEW -->
+    <div id="view-split-tunnel" class="view">
+      <div class="view-header">
+        <button class="back-btn" data-view="main"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <h2>Split Tunnel</h2>
+      </div>
+      <div class="view-body">
+        <p class="hint">Domains matching these rules bypass the VPN tunnel.</p>
+        <div class="form-card">
+          <div class="form-group">
+            <label for="split_rules_view">Rules (one per line)</label>
+            <textarea id="split_rules_view" rows="8" placeholder="*.ir&#10;aparat.com&#10;divar.ir"></textarea>
+          </div>
+          <div class="form-actions">
+            <button id="btn-split-save" class="btn-primary">Save</button>
+          </div>
         </div>
-        <pre id="log-content" style="background: #1a1a1a; color: #0f0; padding: 12px; border-radius: 6px; max-height: 400px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all"></pre>
+        <div id="split-msg" class="msg"></div>
       </div>
     </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+
+    <!-- LOG VIEW -->
+    <div id="view-log" class="view">
+      <div class="view-header">
+        <button class="back-btn" data-view="main"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <h2>Log</h2>
+        <button id="btn-refresh-log" class="btn-sm" style="margin-left:auto">Refresh</button>
+      </div>
+      <div class="view-body">
+        <pre id="log-content"></pre>
+      </div>
+    </div>
+
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
 </html>
