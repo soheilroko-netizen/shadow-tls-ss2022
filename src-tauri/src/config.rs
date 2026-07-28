@@ -128,10 +128,17 @@ impl ProfileStore {
             let default_config = Config::load().unwrap_or_default();
             return Ok(Self {
                 profiles: vec![Profile {
-                    name: "Default".to_string(),
-                    config: default_config,
+                    name: "Germany 1".to_string(),
+                    config: default_config.clone(),
+                },
+                Profile {
+                    name: "Finland".to_string(),
+                    config: Config {
+                        server_address: "62.238.60.136".to_string(),
+                        ..default_config
+                    },
                 }],
-                active_profile: "Default".to_string(),
+                active_profile: "Germany 1".to_string(),
             });
         }
         let content = fs::read_to_string(&path)?;
