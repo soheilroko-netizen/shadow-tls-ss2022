@@ -782,3 +782,33 @@ mod tests {
         }
     }
 }
+
+// ─── Stub commands for split tunnel and app settings ───────────────────────
+
+pub fn get_split_enabled() -> Result<bool, String> {
+    Ok(false)
+}
+
+pub fn set_split_enabled(enabled: bool) -> Result<(), String> {
+    Ok(())
+}
+
+pub fn convert_to_v9() -> Result<(), String> {
+    Ok(())
+}
+
+pub fn save_app_settings(settings: config::AppSettings) -> Result<(), String> {
+    use std::fs::File;
+    use std::io::Write;
+
+    let path = crate::config::config_dir()?.join("app-settings.json");
+    let json = serde_json::to_string_pretty(&settings)?;
+    let mut file = File::create(&path).map_err(|e| format!("can't create app-settings.json: {}", e))?;
+    file.write_all(json.as_bytes()).map_err(|e| format!("can't write app-settings.json: {}", e))?;
+    Ok(())
+}
+
+pub fn save_split_rules(mode: &str, processes: Vec<String>, domains: Vec<String>) -> Result<(), String> {
+    Ok(())
+}
+

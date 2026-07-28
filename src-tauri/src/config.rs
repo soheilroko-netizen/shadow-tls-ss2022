@@ -5,15 +5,30 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+// Single source of truth for app identifiers
+pub const APP_QUALIFIER: &str = "com";
+pub const APP_ORG: &str = "dakal-tls";
+pub const APP_NAME: &str = "dakal-tls";
+
+pub fn config_dir() -> Result<PathBuf> {
+    let proj_dirs = ProjectDirs::from(APP_QUALIFIER, APP_ORG, APP_NAME)
+        .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
+    let dir = proj_dirs.config_dir();
+    fs::create_dir_all(dir)?;
+    Ok(dir.to_path_buf())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default = "default_server_address")]
     pub server_address: String,
     #[serde(default = "default_ss_port")]
     pub ss_port: u16,
+    #[serde(default)]
     pub ss_password: String,
     #[serde(default = "default_stls_port")]
     pub stls_port: u16,
+    #[serde(default)]
     pub stls_password: String,
     #[serde(default = "default_stls_sni")]
     pub stls_sni: String,
@@ -31,6 +46,8 @@ pub struct Config {
     pub split_domains: Vec<String>,
     #[serde(default)]
     pub split_rules: Vec<SplitRule>,
+    #[serde(default)]
+    pub split_enabled: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,9 +83,9 @@ impl Default for Config {
         Self {
             server_address: "ns.baft.uk".to_string(),
             ss_port: 8380,
-            ss_password: "tE+3/qlN/orCZRVUutWouysZ8BQs4RWzq46WK6CDGG4=".to_string(),
+            ss_password: String::new(),
             stls_port: 8553,
-            stls_password: "y2lachetore".to_string(),
+            stls_password: String::new(),
             stls_sni: "dl.google.com".to_string(),
             socks5_port: 1080,
             mtu: None,
@@ -77,17 +94,14 @@ impl Default for Config {
             split_processes: vec![],
             split_domains: vec![],
             split_rules: vec![],
+            split_enabled: false,
         }
     }
 }
 
 impl Config {
     pub fn config_path() -> Result<PathBuf> {
-        let proj_dirs = ProjectDirs::from("com", "stls", "stls")
-            .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-        let config_dir = proj_dirs.config_dir();
-        fs::create_dir_all(config_dir)?;
-        Ok(config_dir.join("config.json"))
+        Ok(config_dir()?.join("config.json"))
     }
 
     pub fn load() -> Result<Self> {
@@ -99,7 +113,7 @@ impl Config {
         match serde_json::from_str::<Config>(&content) {
             Ok(config) => Ok(config),
             Err(_) => {
-                eprintln!("[stls] config parse failed, using defaults");
+                eprintln!("[dakal-tls] config parse failed, using defaults");
                 Ok(Self::default())
             }
         }
@@ -115,11 +129,7 @@ impl Config {
 
 impl ProfileStore {
     fn profiles_path() -> Result<PathBuf> {
-        let proj_dirs = ProjectDirs::from("com", "stls", "stls")
-            .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-        let config_dir = proj_dirs.config_dir();
-        fs::create_dir_all(config_dir)?;
-        Ok(config_dir.join("profiles.json"))
+        Ok(config_dir()?.join("profiles.json"))
     }
 
     pub fn load() -> Result<Self> {
@@ -127,17 +137,19 @@ impl ProfileStore {
         if !path.exists() {
             let default_config = Config::load().unwrap_or_default();
             return Ok(Self {
-                profiles: vec![Profile {
-                    name: "Germany 1".to_string(),
-                    config: default_config.clone(),
-                },
-                Profile {
-                    name: "Finland".to_string(),
-                    config: Config {
-                        server_address: "62.238.60.136".to_string(),
-                        ..default_config
+                profiles: vec![
+                    Profile {
+                        name: "Germany 1".to_string(),
+                        config: default_config.clone(),
                     },
-                }],
+                    Profile {
+                        name: "Finland".to_string(),
+                        config: Config {
+                            server_address: "62.238.60.136".to_string(),
+                            ..default_config
+                        },
+                    },
+                ],
                 active_profile: "Germany 1".to_string(),
             });
         }
@@ -195,5 +207,60 @@ impl ProfileStore {
         } else {
             anyhow::bail!("Active profile '{}' not found", self.active_profile);
         }
+    }
+}
+
+// ── App settings persistence ───────────────────────────────────
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    #[serde(default = "default_language")]
+    pub language: String,
+    #[serde(default)]
+    pub auto_start: bool,
+    #[serde(default)]
+    pub minimize_tray: bool,
+    #[serde(default)]
+    pub notify_connect: bool,
+    #[serde(default = "default_ping_interval")]
+    pub ping_interval: u32,
+}
+
+fn default_language() -> String { "en".to_string() }
+fn default_ping_interval() -> u32 { 1 }
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            language: "en".to_string(),
+            auto_start: false,
+            minimize_tray: false,
+            notify_connect: false,
+            ping_interval: 1,
+        }
+    }
+}
+
+impl AppSettings {
+    fn path() -> Result<PathBuf> {
+        Ok(config_dir()?.join("app-settings.json"))
+    }
+
+    pub fn load() -> Result<Self> {
+        let path = Self::path()?;
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+        let content = fs::read_to_string(&path)?;
+        match serde_json::from_str::<AppSettings>(&content) {
+            Ok(s) => Ok(s),
+            Err(_) => Ok(Self::default()),
+        }
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let path = Self::path()?;
+        let content = serde_json::to_string_pretty(self)?;
+        fs::write(&path, content)?;
+        Ok(())
     }
 }

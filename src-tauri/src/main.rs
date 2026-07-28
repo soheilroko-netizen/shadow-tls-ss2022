@@ -525,10 +525,17 @@ fn main() {
             switch_profile,
             switch_profile_stop,
             real_ping,
+            get_ping,
             get_traffic,
             get_total_traffic,
             get_uptime,
             get_log,
+            save_app_settings,
+            save_split_rules,
+            open_settings,
+            get_split_enabled,
+            set_split_enabled,
+            convert_to_v9,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");

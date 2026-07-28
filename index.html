@@ -12,269 +12,84 @@
 <body>
   <div id="bg" class="bg-full"></div>
 
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-inner">
-      <!-- Profile Selector -->
-      <div class="profile-selector" id="profile-selector">
-        <div class="avatar">G</div>
-        <div class="profile-info">
-          <div class="profile-name" id="active-profile-name">Germany 1</div>
-          <div class="profile-label">Active Profile</div>
-        </div>
-        <div class="profile-arrow" id="profile-arrow">&#x25be;</div>
-      </div>
-      <div class="profile-dropdown" id="profile-dropdown">
-      </div>
-
-      <nav class="nav">
-        <div class="nav-item active" data-view="dashboard" id="nav-dashboard">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h6v8H3V3zm0 10h6v4H3v-4zm8-10h6v4h-6V3zm0 6h6v8h-6V9z"/></svg>
-          <span>Dashboard</span>
-        </div>
-        <div class="nav-item" data-view="profile-settings" id="nav-profile-settings">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16z"/></svg>
-          <span>Profile Settings</span>
-        </div>
-        <div class="nav-item" data-view="app-settings" id="nav-app-settings">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"/></svg>
-          <span>Profile Settings</span>
-        </div>
-        <div class="nav-item" data-view="split-tunnel" id="nav-split-tunnel">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8-6a6 6 0 100 12 6 6 0 000-12z"/><path d="M10 6a1 1 0 011 1v3a1 1 0 01-1 1H7a1 1 0 110-2h2V7a1 1 0 011-1z"/></svg>
-          <span>Split Tunnel</span>
-        </div>
-        <div class="nav-item" data-view="log" id="nav-log">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 1a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1V5zm0 4a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1V9zm0 4a1 1 0 011-1h6a1 1 0 011 1v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-1z"/></svg>
-          <span>Log</span>
-        </div>
-      </nav>
-
-      <div class="sidebar-footer">
-        <span class="version">v7.0</span>
-      </div>
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <!-- Split tunnel indicator -->
+    <div class="split-indicator" id="split-indicator" title="Split Tunnel Status">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <path d="M6 4v6a4 4 0 004 4h4a4 4 0 014 4v2" />
+        <path d="M18 4v6a4 4 0 01-4 4H10a4 4 0 00-4 4v2" />
+        <path d="M9 4l-3 3-3-3M21 4l-3 3-3-3" />
+      </svg>
     </div>
-  </aside>
 
-  <main id="main">
-    <div class="view active" id="view-dashboard">
-      <!-- Power ring centered on planet -->
-      <div class="planet-section" id="planet-section">
-        <div class="power-ring" id="power-ring">
-          <button class="power-btn" id="btn-connect">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="24" height="24">
-              <!-- Classic power icon: circle with vertical line -->
-              <circle cx="12" cy="12" r="9"/>
-              <path d="M12 4v8"/>
-            </svg>
-          </button>
-        </div>
-        <div class="status-section">
-          <div class="status-badge" id="status-badge">
-            <span class="status-dot" id="status-dot"></span>
-            <span id="status-text">Disconnected</span>
-          </div>
-          <div class="server-location" id="server-location">&#x2014;</div>
-          <div class="timer" id="timer">00:00:00</div>
-        </div>
-      </div>
+    <!-- App name centered -->
+    <div class="app-title">dakal-tls</div>
 
-      <!-- Ping Widget -->
-      <div class="ping-widget" id="ping-widget">
-        <div class="ping-header">
-          <span class="ping-label">PING</span>
-        </div>
-        <div class="ping-value" id="ping-value">&#x2014;</div>
-        <canvas class="ping-graph" id="ping-graph" width="160" height="40"></canvas>
-      </div>
+    <!-- Hamburger menu → settings -->
+    <button class="menu-btn" id="menu-btn" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  </header>
 
-      <!-- Bottom Bar -->
-      <div class="bottom-bar">
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.34 6.5A7 7 0 0012 16.93V14a2 2 0 00-2-2H8v-2a1 1 0 00-1-1H5V7.5c0-.48.18-.93.34-1zm8.56-1.16A2 2 0 0011 4h-2a2 2 0 00-2 2v1h4v2a1 1 0 001 1h1v.5h1.4A6.98 6.98 0 0017 10a7 7 0 00-3.1-4.66z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">CURRENT SERVER</div>
-            <div class="stat-value" id="stat-server">&#x2014;</div>
-          </div>
-          <div class="signal-bars">
-            <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div><div class="bar b4"></div><div class="bar b5"></div>
-          </div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">CONNECTED TIME</div>
-            <div class="stat-value" id="stat-time">00:00:00</div>
-          </div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <svg class="stat-icon" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path d="M10 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1z"/></svg>
-          <div class="stat-labels">
-            <div class="stat-title">DATA USAGE</div>
-            <div class="stat-value" id="stat-traffic">&#x2191; 0 B &#xb7; &#x2193; 0 B</div>
-          </div>
-        </div>
+  <!-- Main Content -->
+  <main id="main" class="main-content">
+    <!-- Power Button -->
+    <div class="power-section" id="power-section">
+      <div class="power-ring" id="power-ring">
+        <button class="power-btn" id="btn-connect">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="28" height="28">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 4v8"/>
+          </svg>
+        </button>
       </div>
     </div>
 
-    <!-- Profile Settings View -->
-    <div class="view" id="view-profile-settings">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
-        <h2>Profile Settings</h2>
+    <!-- Status + Timer -->
+    <div class="status-section" id="status-section">
+      <div class="status-badge" id="status-badge">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Disconnected</span>
       </div>
-      <div class="settings-form">
-        <div class="form-group">
-          <label>Profile Name</label>
-          <input type="text" id="profile-name-input" value="Germany 1">
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Server Address</label>
-            <input type="text" id="server-address" placeholder="ns.baft.uk">
-          </div>
-          <div class="form-group half">
-            <label>Socks5 Port</label>
-            <input type="number" id="socks5-port" placeholder="1080" value="1080">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>SS Port</label>
-            <input type="number" id="ss-port" placeholder="8380" value="8380">
-          </div>
-          <div class="form-group half">
-            <label>SS Password</label>
-            <input type="password" id="ss-password" placeholder="SS password">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>ShadowTLS Port</label>
-            <input type="number" id="stls-port" placeholder="8553" value="8553">
-          </div>
-          <div class="form-group half">
-            <label>ShadowTLS Password</label>
-            <input type="password" id="stls-password" placeholder="STLS password">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>ShadowTLS SNI</label>
-          <input type="text" id="stls-sni" placeholder="dl.google.com" value="dl.google.com">
-        </div>
-        <div class="form-row">
-          <div class="form-group half">
-            <label>Encryption Method</label>
-            <select id="encryption-method">
-              <option value="aes-256-gcm">AES-256-GCM</option>
-              <option value="chacha20-ietf-poly1305">ChaCha20-Poly1305</option>
-              <option value="aes-128-gcm">AES-128-GCM</option>
-              <option value="2022-blake3-aes-256-gcm">2022-Blake3-AES-256-GCM</option>
-            </select>
-          </div>
-          <div class="form-group half">
-            <label>MTU</label>
-            <input type="number" id="mtu" placeholder="1500">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Auto Connect</label>
-          <select id="auto-connect">
-            <option value="true">Enabled</option>
-            <option value="false" selected>Disabled</option>
-          </select>
-        </div>
-        <div class="profile-actions">
-          <button class="btn-save" id="btn-save-profile">Save Profile</button>
-          <button class="btn-add" id="btn-add-profile">+ Add Profile</button>
-          <button class="btn-delete" id="btn-delete-profile">Delete</button>
-        </div>
+      <div class="timer" id="timer">00:00:00</div>
+    </div>
+
+    <!-- Profile Selector -->
+    <div class="profile-selector" id="profile-selector">
+      <div class="profile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>
+        </svg>
+      </div>
+      <span class="profile-name" id="active-profile-name">Germany 1</span>
+      <svg class="profile-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+      <div class="profile-dropdown" id="profile-dropdown"></div>
+    </div>
+
+    <!-- Data + Ping Row -->
+    <div class="stats-row">
+      <!-- Data Usage -->
+      <div class="stat-card">
+        <div class="stat-card-label">DATA</div>
+        <div class="stat-card-value" id="stat-traffic">↺ 0B · 0B</div>
+      </div>
+      <!-- Ping -->
+      <div class="stat-card">
+        <div class="stat-card-label">PING</div>
+        <div class="stat-card-value" id="ping-value">— ms</div>
       </div>
     </div>
 
-    <!-- App Settings View -->
-    <div class="view" id="view-app-settings">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
-        <h2>App Settings</h2>
-      </div>
-      <div class="settings-form">
-        <div class="form-group">
-          <label>Language</label>
-          <select id="language">
-            <option value="en">English</option>
-            <option value="fa">&#x641;&#x627;&#x631;&#x633;&#x6CC;</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Auto-start on boot</label>
-          <select id="auto-start">
-            <option value="true">Enabled</option>
-            <option value="false" selected>Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Minimize to tray</label>
-          <select id="minimize-tray">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Notification on connect</label>
-          <select id="notif-connect">
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Ping interval (seconds)</label>
-          <input type="number" id="ping-interval" value="1">
-        </div>
-        <button class="btn-save" id="btn-save-app">Save Settings</button>
-      </div>
-    </div>
-
-    <!-- Split Tunnel View -->
-    <div class="view" id="view-split-tunnel">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
-        <h2>Split Tunnel</h2>
-      </div>
-      <div class="split-tunnel-panel">
-        <div class="form-group">
-          <label>Mode</label>
-          <select id="split-mode">
-            <option value="exclude">Exclude (bypass VPN)</option>
-            <option value="include">Include (only VPN)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Process Names (one per line)</label>
-          <textarea id="split-processes" rows="4" placeholder="chrome.exe
-firefox.exe"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Domain/IP Rules (one per line)</label>
-          <textarea id="split-domains" rows="4" placeholder="example.com
-192.168.1.0/24"></textarea>
-        </div>
-        <button class="btn-save" id="btn-save-split">Save Rules</button>
-      </div>
-    </div>
-
-    <!-- Log View -->
-    <div class="view" id="view-log">
-      <div class="view-header">
-        <button class="back-btn" data-view="dashboard">&#x2190; Back</button>
-        <h2>Connection Log</h2>
-        <button class="btn-clear-log" id="btn-clear-log">Clear</button>
-      </div>
-      <div class="log-container" id="log-container">
-        <div class="log-placeholder">No events yet.</div>
-      </div>
-    </div>
+    <!-- Reserved empty area for future features -->
+    <div class="future-area" id="future-area"></div>
   </main>
 
   <script type="module" src="src/main.ts"></script>

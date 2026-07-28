@@ -1,37 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-interface Config {
-  server_address: string;
-  ss_port: number;
-  ss_password: string;
-  stls_port: number;
-  stls_password: string;
-  stls_sni: string;
-  socks5_port: number;
-  mtu: number | null;
-  auto_connect: boolean;
-  encryption_method: string;
-  split_mode: string;
-  split_processes: string[];
-  split_domains: string[];
-}
-
-interface TradefaceTrafficData {
-  up: number;
-  down: number;
-}
-
-interface ProfileData {
-  name: string;
-  config: Config;
-}
-
-interface ProfileStoreData {
-  profiles: ProfileData[];
-  active_profile: string;
-}
-
 let connected = false;
 let connectStart = 0;
 let timerInterval: number | null = null;
@@ -39,41 +8,57 @@ let trafficInterval: number | null = null;
 let pingInterval: number | null = null;
 let pingHistory: number[] = [];
 const MAX_PING_POINTS = 100;
-let logBuffer: string[] = [];
 
 const $ = (id: string) => document.getElementById(id)!;
 
-// ── View switching ────────────────────────────────────────────
-function showView(viewName: string) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const view = document.getElementById('view-' + viewName);
-  if (view) view.classList.add('active');
-  const navItem = document.getElementById('nav-' + viewName);
-  if (navItem) navItem.classList.add('active');
-  // Refresh profiles when entering profile settings
-  if (viewName === 'profile-settings') loadProfilesList();
+// ── Settings window control ──────────────────────────────────────────
+async function openSettings(tab: string = 'profile') {
+  try {
+    await invoke('open_settings', { tab });
+  } catch (e: any) {
+    console.error('Failed to open settings:', e);
+  }
 }
 
-// ── Navigation ────────────────────────────────────────────────
-document.querySelectorAll('.nav-item').forEach(el => {
-  el.addEventListener('click', () => {
-    const view = el.getAttribute('data-view');
-    if (view) showView(view);
-  });
+// ── Split tunnel toggle ──────────────────────────────────────────────
+async function toggleSplit() {
+  try {
+    const current = await invoke<boolean>('get_split_enabled');
+    await invoke('set_split_enabled', { enabled: !current });
+    updateSplitIndicator();
+    addLog(`Split tunnel ${!current ? 'enabled' : 'disabled'}`);
+  } catch (e: any) {
+    addLog('Toggle split failed: ' + String(e));
+  }
+}
+
+function updateSplitIndicator() {
+  invoke<boolean>('get_split_enabled').then(enabled => {
+    const el = $('split-indicator');
+    if (el) {
+      if (enabled) el.classList.add('active');
+      else el.classList.remove('active');
+    }
+  }).catch(() => {});
+}
+
+// ── View visibility ───────────────────────────────────────────────
+function hideAllSettings() {
+  // Close settings window
+  const settingsWindow = getCurrentWindow();
+  settingsWindow.hide().catch(() => {});
+}
+
+$(document).querySelector('.menu-btn')?.addEventListener('click', async () => {
+  await openSettings();
 });
 
-document.querySelectorAll('.back-btn').forEach(el => {
-  el.addEventListener('click', () => showView('dashboard'));
-});
-
-// ── Profile Selector (sidebar top) ────────────────────────────
+// ── Profile Selector ───────────────────────────────────────────────
 $('profile-selector')?.addEventListener('click', () => {
   const dropdown = $('profile-dropdown');
   dropdown.classList.toggle('show');
 });
 
-// Close dropdown on click outside
 document.addEventListener('click', (e) => {
   const sel = $('profile-selector');
   const dd = $('profile-dropdown');
@@ -91,7 +76,6 @@ async function loadProfilesDropdown() {
       `<div class="dropdown-item" data-profile="${p.name}">${p.name}</div>`
     ).join('');
     $('active-profile-name').textContent = store.active_profile;
-    // Bind click on new items
     dd.querySelectorAll('.dropdown-item').forEach(item => {
       item.addEventListener('click', async () => {
         const name = item.getAttribute('data-profile') || '';
@@ -101,16 +85,37 @@ async function loadProfilesDropdown() {
           dd.classList.remove('show');
           addLog('Switched to: ' + name);
           loadConfig();
-          loadProfilesList();
+          loadProfilesDropdown();
         } catch (e: any) {
           addLog('Switch failed: ' + String(e));
         }
       });
     });
+    // Initialize split indicator state
+    updateSplitIndicator();
   } catch { /* ignore */ }
 }
 
-// ── Connect / Disconnect ──────────────────────────────────────
+interface ProfileStoreData {
+  profiles: { name: string; config: Config }[];
+  active_profile: string;
+}
+interface Config {
+  server_address: string;
+  ss_port: number;
+  ss_password: string;
+  stls_port: number;
+  stls_password: string;
+  stls_sni: string;
+  socks5_port: number;
+  mtu: number | null;
+  encryption_method: string;
+  split_mode: string;
+  split_processes: string[];
+  split_domains: string[];
+}
+
+// ─── Connect / Disconnect ─────────────────────────────────────────
 $('btn-connect')?.addEventListener('click', async () => {
   if (!connected) {
     try {
@@ -136,11 +141,14 @@ $('btn-connect')?.addEventListener('click', async () => {
 });
 
 function updateConnectionUI() {
-  const main = document.querySelector('#main')!;
-  main.classList.toggle('connected', connected);
-  $('status-text').textContent = connected ? 'CONNECTED' : 'Disconnected';
+  const ring = $('power-ring');
+  const status = $('status-text');
+  const dot = $('status-dot');
+  if (ring) ring.classList.toggle('active', connected);
+  if (status) status.textContent = connected ? 'CONNECTED' : 'Disconnected';
 }
 
+// ─── Timers ────────────────────────────────────────────────────────
 function startTimers() {
   connectStart = Date.now();
   if (timerInterval) clearInterval(timerInterval);
@@ -167,26 +175,34 @@ function updateTimer() {
   const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
   const s = String(elapsed % 60).padStart(2, '0');
   const time = `${h}:${m}:${s}`;
-  $('timer').textContent = time;
   $('stat-time').textContent = time;
+  $('timer').textContent = time;
 }
 
-// ── Traffic polling (1s) ──────────────────────────────────────
+// ─── Traffic polling ───────────────────────────────────────────────
 async function startTrafficPolling() {
+  const start = Date.now();
   await pollTraffic();
   if (trafficInterval) clearInterval(trafficInterval);
   trafficInterval = window.setInterval(pollTraffic, 1000);
+  console.log(`[dakal-tls] traffic poll interval active (started in ${Date.now() - start}ms)`);
 }
 
 async function pollTraffic() {
   if (!connected) return;
   try {
     const raw = await invoke<string>('get_total_traffic');
-    const data = JSON.parse(raw) as TradefaceTrafficData;
+    const data = JSON.parse(raw) as { up: number; down: number };
     const upFmt = formatBytes(data.up);
     const downFmt = formatBytes(data.down);
-    $('stat-traffic').textContent = `\u2191 ${upFmt} \u00b7 \u2193 ${downFmt}`;
-  } catch { /* ignore */ }
+    $('stat-traffic').textContent = `↻ ${upFmt} · ${downFmt}`;
+  } catch (e) {
+    // Ignore traffic errors
+    const el = $('stat-traffic');
+    if (el && !el.textContent.includes('—')) {
+      el.textContent = '↻ Reconnecting...';
+    }
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -196,15 +212,20 @@ function formatBytes(bytes: number): string {
   return (bytes / 1073741824).toFixed(2) + ' GB';
 }
 
-// ── Ping polling (1s) ─────────────────────────────────────────
+// ─── Ping polling ───────────────────────────────────────────────────
 async function startPingPolling() {
+  const start = Date.now();
   await pollPing();
   if (pingInterval) clearInterval(pingInterval);
   pingInterval = window.setInterval(pollPing, 1000);
+  console.log(`[dakal-tls] ping poll interval active (started in ${Date.now() - start}ms)`);
 }
 
 async function pollPing() {
-  if (!connected) return;
+  if (!connected) {
+    $('ping-value').textContent = '— ms';
+    return;
+  }
   try {
     const ping = await invoke<number>('get_ping');
     pingHistory.push(ping);
@@ -212,7 +233,9 @@ async function pollPing() {
     const latest = pingHistory[pingHistory.length - 1];
     $('ping-value').textContent = Math.round(latest) + ' ms';
     drawPingGraph();
-  } catch { /* ignore */ }
+  } catch: any {
+    $('ping-value').textContent = '— ms';
+  }
 }
 
 function drawPingGraph() {
@@ -226,8 +249,8 @@ function drawPingGraph() {
 
   const max = Math.max(...pingHistory, 1);
   ctx.beginPath();
-  ctx.strokeStyle = '#22d3ee';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
   ctx.lineJoin = 'round';
 
   pingHistory.forEach((val, i) => {
@@ -236,47 +259,15 @@ function drawPingGraph() {
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
-
-  ctx.lineTo(w, h);
-  ctx.lineTo(0, h);
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, 'rgba(34, 211, 238, 0.15)');
-  grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
-  ctx.fillStyle = grad;
-  ctx.fill();
 }
 
-// ── Log ───────────────────────────────────────────────────────
+// �─ Log ───────────────────────────────────────────────────────────
 function addLog(msg: string) {
   const ts = new Date().toLocaleTimeString();
-  logBuffer.push(`${ts} ${msg}`);
-  renderLog();
+  console.log(`[${ts}] ${msg}`);
 }
 
-function renderLog() {
-  const container = $('log-container');
-  if (!container) return;
-  if (logBuffer.length === 0) {
-    container.innerHTML = '<div class="log-placeholder">No events yet.</div>';
-    return;
-  }
-  container.innerHTML = logBuffer.map(l => `<div class="log-entry">${escapeHtml(l)}</div>`).join('');
-  container.scrollTop = container.scrollHeight;
-}
-
-function escapeHtml(s: string): string {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-
-$('btn-clear-log')?.addEventListener('click', () => {
-  logBuffer = [];
-  renderLog();
-});
-
-// ── Load & Save Config ────────────────────────────────────────
+// ─── Load & Save Config ────────────────────────────────────────────
 async function loadConfig() {
   try {
     const config = await invoke<Config>('get_config');
@@ -289,12 +280,10 @@ async function loadConfig() {
       if (config.stls_sni) $('stls-sni').value = config.stls_sni;
       ($('socks5-port') as HTMLInputElement).value = String(config.socks5_port || 1080);
       if (config.mtu) ($('mtu') as HTMLInputElement).value = String(config.mtu);
-      if (config.auto_connect !== undefined) ($('auto-connect') as HTMLSelectElement).value = String(config.auto_connect);
       if (config.encryption_method) ($('encryption-method') as HTMLSelectElement).value = config.encryption_method;
-      $('server-location').textContent = config.server_address || '\u2014';
-      $('stat-server').textContent = config.server_address || '\u2014';
+      $('server-location').textContent = config.server_address || '—';
     }
-  } catch { /* config not available */ }
+  } catch { /* ignore */ }
 }
 
 $('btn-save-profile')?.addEventListener('click', async () => {
@@ -307,7 +296,6 @@ $('btn-save-profile')?.addEventListener('click', async () => {
     stls_sni: ($('stls-sni') as HTMLInputElement).value || 'dl.google.com',
     socks5_port: parseInt(($('socks5-port') as HTMLInputElement).value) || 1080,
     mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
-    auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
     encryption_method: ($('encryption-method') as HTMLSelectElement).value || 'chacha20-ietf-poly1305',
     split_mode: 'exclude',
     split_processes: [],
@@ -322,32 +310,16 @@ $('btn-save-profile')?.addEventListener('click', async () => {
   }
 });
 
-// ── Add / Delete Profile ──────────────────────────────────────
+// Add / Delete Profile
 $('btn-add-profile')?.addEventListener('click', async () => {
   const nameInput = $('profile-name-input') as HTMLInputElement;
   const name = nameInput.value.trim();
   if (!name) { addLog('Enter a profile name first'); return; }
-  const config: Config = {
-    server_address: ($('server-address') as HTMLInputElement).value || 'ns.baft.uk',
-    ss_port: parseInt(($('ss-port') as HTMLInputElement).value) || 8380,
-    ss_password: ($('ss-password') as HTMLInputElement).value || '',
-    stls_port: parseInt(($('stls-port') as HTMLInputElement).value) || 8553,
-    stls_password: ($('stls-password') as HTMLInputElement).value || '',
-    stls_sni: ($('stls-sni') as HTMLInputElement).value || 'dl.google.com',
-    socks5_port: parseInt(($('socks5-port') as HTMLInputElement).value) || 1080,
-    mtu: parseInt(($('mtu') as HTMLInputElement).value) || null,
-    auto_connect: ($('auto-connect') as HTMLSelectElement).value === 'true',
-    encryption_method: ($('encryption-method') as HTMLSelectElement).value || 'chacha20-ietf-poly1305',
-    split_mode: 'exclude',
-    split_processes: [],
-    split_domains: [],
-  };
   try {
     await invoke('add_profile', { name, config });
     addLog('Profile created: ' + name);
     loadProfilesDropdown();
-    loadProfilesList();
-  } catch (e: any) {
+  } catch: any {
     addLog('Create failed: ' + String(e));
   }
 });
@@ -359,7 +331,6 @@ $('btn-delete-profile')?.addEventListener('click', async () => {
     await invoke('delete_profile', { name });
     addLog('Deleted: ' + name);
     loadProfilesDropdown();
-    loadProfilesList();
   } catch (e: any) {
     addLog('Delete failed: ' + String(e));
   }
@@ -368,20 +339,19 @@ $('btn-delete-profile')?.addEventListener('click', async () => {
 async function loadProfilesList() {
   try {
     const store = await invoke<ProfileStoreData>('get_profiles');
-    // Update profile name input to active
     $('profile-name-input').value = store.active_profile;
   } catch { /* ignore */ }
 }
 
-// ── Save App Settings ─────────────────────────────────────────
+// Save App Settings
 $('btn-save-app')?.addEventListener('click', async () => {
   try {
     await invoke('save_app_settings', {
       language: ($('language') as HTMLSelectElement).value,
-      autoStart: ($('auto-start') as HTMLSelectElement).value === 'true',
-      minimizeTray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
-      notifyConnect: ($('notif-connect') as HTMLSelectElement).value === 'true',
-      pingInterval: parseInt(($('ping-interval') as HTMLInputElement).value) || 1,
+      auto_start: ($('auto-start') as HTMLSelectElement).value === 'true',
+      minimize_tray: ($('minimize-tray') as HTMLSelectElement).value === 'true',
+      notify_connect: ($('notif-connect') as HTMLSelectElement).value === 'true',
+      ping_interval: parseInt(($('ping-interval') as HTMLInputElement).value) || 1,
     });
     addLog('App settings saved');
   } catch (e: any) {
@@ -389,12 +359,12 @@ $('btn-save-app')?.addEventListener('click', async () => {
   }
 });
 
-// ── Save Split Tunnel ─────────────────────────────────────────
+// Save Split Tunnel
 $('btn-save-split')?.addEventListener('click', async () => {
   const processes = ($('split-processes') as HTMLTextAreaElement).value
-    .split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    .split('\\n').map(s => s.trim()).filter(s => s.length > 0);
   const domains = ($('split-domains') as HTMLTextAreaElement).value
-    .split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    .split('\\n').map(s => s.trim()).filter(s => s.length > 0);
   try {
     await invoke('save_split_rules', {
       mode: ($('split-mode') as HTMLSelectElement).value,
@@ -407,15 +377,14 @@ $('btn-save-split')?.addEventListener('click', async () => {
   }
 });
 
-// ── Select/dropdown color fix ─────────────────────────────────
-// Fix white-on-white dropdown issue by setting CSS on select elements
+// Fix for select color contrast
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('select').forEach(sel => {
     sel.style.color = '#fff';
   });
 });
 
-// ── Init ───────────────────────────────────────────────────────
+// Initialize
 loadConfig();
 loadProfilesDropdown();
 addLog('Application started');
