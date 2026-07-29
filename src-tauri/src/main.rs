@@ -87,18 +87,15 @@ fn show_settings(app: tauri::AppHandle) -> Result<String, String> {
 
 // ── Tray State Update ───────────────────────────────────────────────
 fn update_tray_state(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let state = app.state::<AppState>();
-        let running = state.proxy.lock().unwrap().is_running();
-        
-        if let Some(menu) = window.menu() {
-            if let Some(connect) = menu.get("connect") {
-                let _ = connect.as_ref().set_enabled(!running);
-            }
-            if let Some(disconnect) = menu.get("disconnect") {
-                let _ = disconnect.as_ref().set_enabled(running);
-            }
-        }
+    let state = app.state::<AppState>();
+    let running = state.proxy.lock().unwrap().is_running();
+    
+    // Get menu items by ID and enable/disable
+    if let Some(connect_item) = app.menu().and_then(|m| m.get("connect")) {
+        let _ = connect_item.set_enabled(!running);
+    }
+    if let Some(disconnect_item) = app.menu().and_then(|m| m.get("disconnect")) {
+        let _ = disconnect_item.set_enabled(running);
     }
 }
 

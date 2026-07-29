@@ -81,6 +81,8 @@ impl Default for Config {
             split_processes: vec![],
             split_domains: vec![],
             split_rules: vec![],
+            total_up: None,
+            total_down: None,
         }
     }
 }
