@@ -1,23 +1,11 @@
 {
   "name": "dakal-tls",
-  "version": "5.0.0",
+  "version": "9.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "tauri": "tauri"
+    "build": "mkdir -p dist && cp public/index.html dist/index.html && if exist public\"*.woff2 (copy public\"*.woff2 dist/) else (echo no fonts)"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7"
-  },
-  "dependencies": {
-    "@sveltejs/vite-plugin-svelte": "^5.1.1",
-    "@tauri-apps/api": "^2.2.0",
-    "@tauri-apps/plugin-opener": "^2.0.3",
-    "@tauri-apps/plugin-shell": "^2.0.2",
-    "svelte": "^5.56.8"
+    "@tauri-apps/cli": "^2.1.0"
   }
 }
