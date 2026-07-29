@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { invoke } from '@tauri-apps/api/core'
-
   let { connected, onClick }: {
     connected: boolean
     onClick: () => void

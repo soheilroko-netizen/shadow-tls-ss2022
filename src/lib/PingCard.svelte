@@ -1,11 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-
   let { pingMs }: { pingMs: number | null } = $props()
 
   let history = $state<number[]>([])
   const MAX = 60
-  let canvas: HTMLCanvasElement
+  let canvasEl: HTMLCanvasElement
   let ctx: CanvasRenderingContext2D | null = null
 
   $effect(() => {
@@ -17,10 +15,9 @@
   })
 
   function draw() {
-    if (!canvas) return
-    const c = canvas.getContext('2d')
+    const c = canvasEl?.getContext('2d')
     if (!c) return
-    const w = canvas.width, h = canvas.height
+    const w = canvasEl.width, h = canvasEl.height
     c.clearRect(0, 0, w, h)
     if (history.length < 2) return
     const max = Math.max(...history, 10)
@@ -45,16 +42,12 @@
     c.fillStyle = g
     c.fill()
   }
-
-  onMount(() => {
-    canvas = document.getElementById('pc-canvas') as HTMLCanvasElement
-  })
 </script>
 
 <div class="ping-card">
   <div class="card-label">PING</div>
   <div class="ping-value">{pingMs !== null ? `${pingMs} ms` : '—'}</div>
-  <canvas id="pc-canvas" class="graph" width="140" height="36"></canvas>
+  <canvas bind:this={canvasEl} class="graph" width="140" height="36"></canvas>
 </div>
 
 <style>
