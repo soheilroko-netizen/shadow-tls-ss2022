@@ -403,6 +403,53 @@ impl ProxyManager {
         Ok("Stopped".into())
     }
 
+    /// Ping the Clash API to get real latency
+    pub fn ping(&self) -> Result<u64> {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build()?;
+        
+        let resp = client
+            .get("http://127.0.0.1:9097/proxies/ss-out")
+            .header("Authorization", "Bearer dakal")
+            .send()?;
+        
+        if !resp.status().is_success() {
+            bail!("Clash API not ready");
+        }
+        
+        let json: serde_json::Value = resp.json()?;
+        let delay = json["history"]
+            .as_array()
+            .and_then(|h| h.last())
+            .and_then(|l| l["delay"].as_u64())
+            .ok_or_else(|| anyhow::anyhow!("No delay data"))?;
+        
+        Ok(delay)
+    }
+
+    /// Get traffic stats from Clash API
+    pub fn get_traffic(&self) -> Result<(u64, u64)> {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(3))
+            .build()?;
+        
+        let resp = client
+            .get("http://127.0.0.1:9097/traffic")
+            .header("Authorization", "Bearer dakal")
+            .send()?;
+        
+        if !resp.status().is_success() {
+            bail!("Traffic API not ready");
+        }
+        
+        let json: serde_json::Value = resp.json()?;
+        let up = json["up"].as_u64().unwrap_or(0);
+        let down = json["down"].as_u64().unwrap_or(0);
+        
+        Ok((up, down))
+    }
+
     // ── VPN / TUN mode config ─────────────────────────────────────
 
     fn build_vpn_config(&self) -> Result<SbConfig> {

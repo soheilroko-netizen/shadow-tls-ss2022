@@ -31,6 +31,10 @@ pub struct Config {
     pub split_domains: Vec<String>,
     #[serde(default)]
     pub split_rules: Vec<SplitRule>,
+    #[serde(default)]
+    pub total_up: Option<u64>,
+    #[serde(default)]
+    pub total_down: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

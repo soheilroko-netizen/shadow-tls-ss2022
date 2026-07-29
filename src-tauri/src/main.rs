@@ -91,12 +91,13 @@ fn update_tray_state(app: &tauri::AppHandle) {
         let state = app.state::<AppState>();
         let running = state.proxy.lock().unwrap().is_running();
         
-        let menu = window.menu().unwrap();
-        if let Some(connect) = menu.get("connect") {
-            let _ = connect.set_enabled(!running);
-        }
-        if let Some(disconnect) = menu.get("disconnect") {
-            let _ = disconnect.set_enabled(running);
+        if let Some(menu) = window.menu() {
+            if let Some(connect) = menu.get("connect") {
+                let _ = connect.as_ref().set_enabled(!running);
+            }
+            if let Some(disconnect) = menu.get("disconnect") {
+                let _ = disconnect.as_ref().set_enabled(running);
+            }
         }
     }
 }
