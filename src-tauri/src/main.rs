@@ -41,9 +41,8 @@ fn check_single_instance() {}
 
 // ── Modules ──────────────────────────────────────────────────────────
 mod config;
-mod profile;
 mod proxy;
-
+mod sysdns;
 use config::ProfileStore;
 use proxy::ProxyManager;
 
