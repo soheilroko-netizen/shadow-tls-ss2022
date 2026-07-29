@@ -1,6 +1,15 @@
 // main.rs - Tauri app entry with commands (v9)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::Mutex;
+use std::time::Instant;
+
+use tauri::{
+    menu::{MenuBuilder, MenuItemBuilder},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, State, WebviewUrl, WebviewWindowBuilder,
+};
+
 // ── Single-instance guard via named mutex (Windows) ──────────────────
 #[cfg(target_os = "windows")]
 fn check_single_instance() {
@@ -14,7 +23,7 @@ fn check_single_instance() {
         ) -> *mut std::ffi::c_void;
         fn GetLastError() -> u32;
     }
-    let name = CString::new("Local\\stls-single-instance-mutex").unwrap();
+    let name = CString::new("Local\\\\stls-single-instance-mutex").unwrap();
     let handle = unsafe { CreateMutexA(ptr::null_mut(), 0, name.as_ptr()) };
     if handle.is_null() {
         eprintln!("[stls] CreateMutexA failed");
@@ -30,381 +39,23 @@ fn check_single_instance() {
 #[cfg(not(target_os = "windows"))]
 fn check_single_instance() {}
 
-use std::sync::Mutex;
-use std::time::Instant;
+// ── Modules ──────────────────────────────────────────────────────────
+mod config;
+mod profile;
+mod proxy;
 
-use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
-
-use config::{Config, ProfileStore};
+use config::ProfileStore;
 use proxy::ProxyManager;
 
-mod config;
-mod proxy;
-mod sysdns;
-
+// ── App State ────────────────────────────────────────────────────────
 struct AppState {
     proxy: Mutex<ProxyManager>,
     started_at: Mutex<Option<Instant>>,
     split_enabled: Mutex<bool>,
 }
 
-// ── Tray menu rebuild helper ───────────────────────────────────
-
-fn update_tray_state(app: &tauri::AppHandle) {
-    let state: tauri::State<AppState> = app.state::<AppState>();
-    let running = state.proxy.lock().unwrap().is_running();
-    drop(state);
-
-    let profile_name = ProfileStore::load()
-        .map(|s| s.active_profile)
-        .unwrap_or_else(|_| "dakal-tls".to_string());
-
-    let tooltip = if running {
-        format!("dakal-tls VPN — {} (connected)", profile_name)
-    } else {
-        "dakal-tls VPN".to_string()
-    };
-
-    let show = MenuItemBuilder::with_id("show", "Show").build(app).unwrap();
-    let hide = MenuItemBuilder::with_id("hide", "Hide").build(app).unwrap();
-    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app).unwrap();
-    let profile = MenuItemBuilder::with_id("profile", &profile_name)
-        .enabled(false)
-        .build(app)
-        .unwrap();
-
-    let menu = if running {
-        let disc = MenuItemBuilder::with_id("disconnect", "Disconnect")
-            .build(app)
-            .unwrap();
-        MenuBuilder::new(app)
-            .item(&profile)
-            .item(&disc)
-            .separator()
-            .item(&show)
-            .item(&hide)
-            .separator()
-            .item(&quit)
-            .build()
-            .unwrap()
-    } else {
-        let conn = MenuItemBuilder::with_id("connect", "Connect")
-            .build(app)
-            .unwrap();
-        MenuBuilder::new(app)
-            .item(&profile)
-            .item(&conn)
-            .separator()
-            .item(&show)
-            .item(&hide)
-            .separator()
-            .item(&quit)
-            .build()
-            .unwrap()
-    };
-
-    if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(&tooltip));
-        let _ = tray.set_menu(Some(menu));
-    }
-}
-
-// ── Tauri commands ──────────────────────────────────────────────
-
-#[tauri::command]
-fn start_proxy(app: tauri::AppHandle, state: State<AppState>) -> Result<String, String> {
-    let mut proxy = state.proxy.lock().unwrap();
-    let result = proxy.start().map_err(|e| e.to_string())?;
-    *state.started_at.lock().unwrap() = Some(Instant::now());
-    drop(proxy);
-    update_tray_state(&app);
-    Ok(result)
-}
-
-#[tauri::command]
-fn stop_proxy(app: tauri::AppHandle, state: State<AppState>) -> Result<String, String> {
-    let mut proxy = state.proxy.lock().unwrap();
-    let result = proxy.stop().map_err(|e| e.to_string())?;
-    *state.started_at.lock().unwrap() = None;
-    drop(proxy);
-    update_tray_state(&app);
-    Ok(result)
-}
-
-#[tauri::command]
-fn get_status(state: State<AppState>) -> Result<bool, String> {
-    Ok(state.proxy.lock().unwrap().is_running())
-}
-
-#[tauri::command]
-fn get_config() -> Result<Config, String> {
-    let store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store.get_active_config().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn save_config(config: Config) -> Result<String, String> {
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store
-        .update_active_config(config)
-        .map_err(|e| e.to_string())?;
-    Ok("Saved".into())
-}
-
-#[tauri::command]
-fn get_profiles() -> Result<ProfileStore, String> {
-    ProfileStore::load().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn add_profile(name: String, config: Config) -> Result<String, String> {
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store.add_profile(name.clone(), config).map_err(|e| e.to_string())?;
-    Ok(format!("Created '{}'", name))
-}
-
-#[tauri::command]
-fn delete_profile(name: String) -> Result<String, String> {
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store.delete_profile(&name).map_err(|e| e.to_string())?;
-    Ok(format!("Deleted '{}'", name))
-}
-
-#[tauri::command]
-fn switch_profile(name: String) -> Result<String, String> {
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store.switch_profile(&name).map_err(|e| e.to_string())?;
-    Ok(format!("Switched to '{}'", name))
-}
-
-#[tauri::command]
-fn switch_profile_stop(name: String, state: State<AppState>) -> Result<String, String> {
-    let mut proxy = state.proxy.lock().unwrap();
-    if proxy.is_running() {
-        proxy.stop().map_err(|e| e.to_string())?;
-        *state.started_at.lock().unwrap() = None;
-    }
-    drop(proxy);
-
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    store.switch_profile(&name).map_err(|e| e.to_string())?;
-    Ok(format!("Switched to '{}'", name))
-}
-
-#[tauri::command]
-fn get_traffic() -> Result<String, String> {
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
-    use std::time::Duration;
-
-    let mut stream = TcpStream::connect_timeout(
-        &"127.0.0.1:9097".parse().map_err(|e| format!("addr: {e}"))?,
-        Duration::from_secs(2),
-    )
-    .map_err(|e| format!("connect: {e}"))?;
-
-    stream
-        .set_read_timeout(Some(Duration::from_millis(800)))
-        .map_err(|e| format!("set_read_timeout: {e}"))?;
-
-    let req = "GET /traffic HTTP/1.1\r\nHost: 127.0.0.1:9097\r\nAuthorization: Bearer dakal\r\nConnection: close\r\n\r\n";
-    stream
-        .write_all(req.as_bytes())
-        .map_err(|e| format!("write: {e}"))?;
-
-    let deadline = Instant::now() + Duration::from_millis(1500);
-    let mut all_data = String::new();
-    let mut buf = [0u8; 2048];
-
-    while Instant::now() < deadline {
-        match stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                all_data.push_str(&String::from_utf8_lossy(&buf[..n]));
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                || e.kind() == std::io::ErrorKind::TimedOut =>
-            {
-                continue;
-            }
-            Err(e) => return Err(format!("read: {e}")),
-        }
-    }
-
-    let mut last_json: Option<(u64, u64)> = None;
-    for line in all_data.lines() {
-        let line = line.trim();
-        if line.starts_with('{') && line.contains("\"up\"") {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
-                let up = v["up"].as_u64().unwrap_or(0);
-                let down = v["down"].as_u64().unwrap_or(0);
-                last_json = Some((up, down));
-            }
-        }
-    }
-
-    let (up, down) = last_json.unwrap_or((0, 0));
-    Ok(format!(r#"{{"up":{},"down":{}}}"#, up, down))
-}
-
-#[tauri::command]
-fn get_total_traffic() -> Result<String, String> {
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
-    use std::time::{Duration, Instant};
-
-    let mut stream = match TcpStream::connect_timeout(
-        &"127.0.0.1:9097".parse().map_err(|e| format!("addr: {e}"))?,
-        Duration::from_secs(2),
-    ) {
-        Ok(s) => s,
-        Err(_) => return Ok(r#"{"up":0,"down":0}"#.into()),
-    };
-
-    stream.set_read_timeout(Some(Duration::from_millis(800))).ok();
-
-    let req = "GET /connections HTTP/1.1\r\nHost: 127.0.0.1:9097\r\nAuthorization: Bearer dakal\r\nConnection: close\r\n\r\n";
-    let _ = stream.write_all(req.as_bytes());
-
-    let deadline = Instant::now() + Duration::from_millis(1500);
-    let mut response = String::new();
-    let mut buf = [0u8; 2048];
-
-    while Instant::now() < deadline {
-        match stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => response.push_str(&String::from_utf8_lossy(&buf[..n])),
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock
-                || e.kind() == std::io::ErrorKind::TimedOut => continue,
-            Err(_) => break,
-        }
-    }
-
-    if let Some(body) = response.split("\r\n\r\n").nth(1) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
-            let up = v["upload_total"].as_u64().unwrap_or(0);
-            let down = v["download_total"].as_u64().unwrap_or(0);
-            return Ok(format!(r#"{{"up":{},"down":{}}}"#, up, down));
-        }
-    }
-
-    Ok(r#"{"up":0,"down":0}"#.into())
-}
-
-#[tauri::command]
-fn get_uptime(state: State<AppState>) -> Result<u64, String> {
-    let guard = state.started_at.lock().unwrap();
-    match *guard {
-        Some(start) => Ok(start.elapsed().as_secs()),
-        None => Ok(0),
-    }
-}
-
-#[tauri::command]
-fn get_log(state: State<AppState>) -> Result<String, String> {
-    let proxy = state.proxy.lock().unwrap();
-    if let Some(f) = std::fs::read_to_string(&proxy.debug_log_path).ok() {
-        Ok(f)
-    } else {
-        Ok("No log available".to_string())
-    }
-}
-
-#[tauri::command]
-fn real_ping(state: State<AppState>) -> Result<String, String> {
-    let running = state.proxy.lock().unwrap().is_running();
-    if !running {
-        return Err("VPN not connected".into());
-    }
-    drop(state);
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-        .map_err(|e| format!("http client: {e}"))?;
-
-    let target = "http://www.gstatic.com/generate_204";
-
-    // warmup
-    let _ = client.get(target).send();
-
-    let start = Instant::now();
-    let resp = client.get(target).send().map_err(|e| format!("measure failed: {e}"))?;
-    if !resp.status().is_success() && resp.status().as_u16() != 204 {
-        return Err(format!("bad status: {}", resp.status()));
-    }
-    let elapsed = start.elapsed();
-
-    let ms = (elapsed.as_micros() as f64 / 1000.0) as u64;
-    Ok(format!("{}ms", ms))
-}
-
-#[tauri::command]
-fn save_app_settings(language: String, auto_start: bool, minimize_tray: bool, notify_connect: bool, ping_interval: u32) -> Result<String, String> {
-    // Persist to a simple app settings file
-    let settings = serde_json::json!({
-        "language": language,
-        "auto_start": auto_start,
-        "minimize_tray": minimize_tray,
-        "notify_connect": notify_connect,
-        "ping_interval": ping_interval,
-    });
-    let path = config::app_settings_path();
-    if let Some(p) = path {
-        std::fs::write(p, serde_json::to_string_pretty(&settings).unwrap()).ok();
-    }
-    Ok("Settings saved".into())
-}
-
-#[tauri::command]
-fn load_app_settings() -> Result<String, String> {
-    let path = config::app_settings_path();
-    if let Some(p) = path {
-        if let Ok(content) = std::fs::read_to_string(&p) {
-            return Ok(content);
-        }
-    }
-    Ok(r#"{"language":"en","auto_start":false,"minimize_tray":true,"notify_connect":true,"ping_interval":1}"#.into())
-}
-
-#[tauri::command]
-fn save_split_rules(mode: String, processes: Vec<String>, domains: Vec<String>) -> Result<String, String> {
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
-    config.split_mode = mode;
-    config.split_processes = processes;
-    config.split_domains = domains;
-    store.update_active_config(config).map_err(|e| e.to_string())?;
-    Ok("Split rules saved".into())
-}
-
-// ── Split tunnel toggle ────────────────────────────────────────────
-
-#[tauri::command]
-fn get_split_state(state: State<AppState>) -> Result<bool, String> {
-    Ok(*state.split_enabled.lock().unwrap())
-}
-
-#[tauri::command]
-fn set_split_state(state: State<AppState>, enabled: bool) -> Result<bool, String> {
-    let mut s = state.split_enabled.lock().unwrap();
-    *s = enabled;
-    // Persist to config
-    if let Ok(mut store) = ProfileStore::load() {
-        if let Ok(mut config) = store.get_active_config() {
-            config.split_mode = if enabled { "exclude".into() } else { "off".into() };
-            store.update_active_config(config).ok();
-        }
-    }
-    Ok(enabled)
-}
-
-// ── Settings window (separate) ─────────────────────────────────────
-
+// ── Settings Window ─────────────────────────────────────────────────
 fn open_settings_window(app: &tauri::AppHandle) {
-    // Check if settings window already exists
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.show();
         let _ = window.set_focus();
@@ -435,15 +86,23 @@ fn show_settings(app: tauri::AppHandle) -> Result<String, String> {
     Ok("Opening settings".into())
 }
 
-fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("dakal-tls v9")
-        .inner_size(430.0, 720.0)
-        .resizable(true)
-        .build()?;
-    Ok(())
+// ── Tray State Update ───────────────────────────────────────────────
+fn update_tray_state(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let state = app.state::<AppState>();
+        let running = state.proxy.lock().unwrap().is_running();
+        
+        let menu = window.menu().unwrap();
+        if let Some(connect) = menu.get("connect") {
+            let _ = connect.set_enabled(!running);
+        }
+        if let Some(disconnect) = menu.get("disconnect") {
+            let _ = disconnect.set_enabled(running);
+        }
+    }
 }
 
+// ── Main ────────────────────────────────────────────────────────────
 fn main() {
     check_single_instance();
 
@@ -461,7 +120,6 @@ fn main() {
 
     let proxy_manager = ProxyManager::new().expect("Failed to init proxy manager");
 
-    // Load persisted split state
     let initial_split = ProfileStore::load()
         .ok()
         .and_then(|s| s.get_active_config().ok())
@@ -574,7 +232,10 @@ fn main() {
             // Initial tray state
             update_tray_state(&app.handle());
 
-            create_main_window(&app.handle())?;
+            // Show the main window (created from tauri.conf.json)
+            if let Some(window) = app.get_webview_window("main") {
+                window.show().ok();
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -583,7 +244,6 @@ fn main() {
                     window.hide().ok();
                     api.prevent_close();
                 }
-                // Settings window can close normally
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -611,4 +271,216 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
+}
+
+// ── Command Handlers ────────────────────────────────────────────────
+#[tauri::command]
+fn get_status(state: State<AppState>) -> Result<String, String> {
+    let proxy = state.proxy.lock().unwrap();
+    let running = proxy.is_running();
+    let split = *state.split_enabled.lock().unwrap();
+    Ok(serde_json::json!({
+        "running": running,
+        "split": split,
+    }).to_string())
+}
+
+#[tauri::command]
+async fn start_proxy(state: State<'_, AppState>) -> Result<String, String> {
+    let mut proxy = state.proxy.lock().unwrap();
+    if !proxy.is_running() {
+        proxy.start().map_err(|e| e.to_string())?;
+        *state.started_at.lock().unwrap() = Some(Instant::now());
+    }
+    Ok("Started".into())
+}
+
+#[tauri::command]
+async fn stop_proxy(state: State<'_, AppState>) -> Result<String, String> {
+    let mut proxy = state.proxy.lock().unwrap();
+    if proxy.is_running() {
+        proxy.stop().map_err(|e| e.to_string())?;
+        *state.started_at.lock().unwrap() = None;
+    }
+    Ok("Stopped".into())
+}
+
+#[tauri::command]
+fn get_config() -> Result<String, String> {
+    let store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let config = store.get_active_config().map_err(|e| e.to_string())?;
+    Ok(serde_json::to_string(&config).unwrap())
+}
+
+#[tauri::command]
+fn save_config(config: String) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let cfg: config::Config = serde_json::from_str(&config).map_err(|e| e.to_string())?;
+    store.update_active_config(cfg).map_err(|e| e.to_string())?;
+    Ok("Saved".into())
+}
+
+#[tauri::command]
+fn get_profiles() -> Result<String, String> {
+    let store = ProfileStore::load().map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({
+        "profiles": store.profiles,
+        "active_profile": store.active_profile,
+    }).to_string())
+}
+
+#[tauri::command]
+fn add_profile(name: String, config: String) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let cfg: config::Config = serde_json::from_str(&config).map_err(|e| e.to_string())?;
+    store.add_profile(name, cfg).map_err(|e| e.to_string())?;
+    Ok("Profile added".into())
+}
+
+#[tauri::command]
+fn delete_profile(name: String) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    store.delete_profile(&name).map_err(|e| e.to_string())?;
+    Ok("Deleted".into())
+}
+
+#[tauri::command]
+fn switch_profile(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    store.switch_profile(&name).map_err(|e| e.to_string())?;
+    let config = store.get_active_config().map_err(|e| e.to_string())?;
+    
+    let mut proxy = state.proxy.lock().unwrap();
+    if proxy.is_running() {
+        proxy.stop().ok();
+        proxy.start().map_err(|e| e.to_string())?;
+    }
+    drop(proxy);
+    
+    *state.started_at.lock().unwrap() = Some(Instant::now());
+    Ok("Switched".into())
+}
+
+#[tauri::command]
+fn switch_profile_stop(state: State<'_, AppState>, name: String) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    store.switch_profile(&name).map_err(|e| e.to_string())?;
+    
+    let mut proxy = state.proxy.lock().unwrap();
+    if proxy.is_running() {
+        proxy.stop().ok();
+    }
+    *state.started_at.lock().unwrap() = None;
+    Ok("Switched (stopped)".into())
+}
+
+#[tauri::command]
+fn real_ping(state: State<AppState>) -> Result<String, String> {
+    let proxy = state.proxy.lock().unwrap();
+    if !proxy.is_running() {
+        return Err("Not connected".into());
+    }
+    let ms = proxy.ping().map_err(|e| e.to_string())?;
+    Ok(format!("{}ms", ms))
+}
+
+#[tauri::command]
+fn get_traffic(state: State<AppState>) -> Result<String, String> {
+    let proxy = state.proxy.lock().unwrap();
+    let (up, down) = proxy.get_traffic().map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({"up": up, "down": down}).to_string())
+}
+
+#[tauri::command]
+fn get_total_traffic() -> Result<String, String> {
+    let store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let config = store.get_active_config().map_err(|e| e.to_string())?;
+    let up = config.total_up.unwrap_or(0);
+    let down = config.total_down.unwrap_or(0);
+    Ok(serde_json::json!({"up": up, "down": down}).to_string())
+}
+
+#[tauri::command]
+fn get_uptime(state: State<AppState>) -> Result<String, String> {
+    let started = *state.started_at.lock().unwrap();
+    if let Some(start) = started {
+        let elapsed = start.elapsed().as_secs();
+        let h = elapsed / 3600;
+        let m = (elapsed % 3600) / 60;
+        let s = elapsed % 60;
+        Ok(format!("{:02}:{:02}:{:02}", h, m, s))
+    } else {
+        Ok("00:00:00".into())
+    }
+}
+
+#[tauri::command]
+fn get_log() -> Result<String, String> {
+    Ok("[]".into())
+}
+
+#[tauri::command]
+fn save_app_settings(
+    language: String,
+    auto_start: bool,
+    minimize_tray: bool,
+    notify_connect: bool,
+    ping_interval: u32,
+) -> Result<String, String> {
+    let settings = serde_json::json!({
+        "language": language,
+        "auto_start": auto_start,
+        "minimize_tray": minimize_tray,
+        "notify_connect": notify_connect,
+        "ping_interval": ping_interval,
+    });
+    let path = config::app_settings_path();
+    if let Some(p) = path {
+        std::fs::write(p, serde_json::to_string_pretty(&settings).unwrap()).ok();
+    }
+    Ok("Settings saved".into())
+}
+
+#[tauri::command]
+fn load_app_settings() -> Result<String, String> {
+    let path = config::app_settings_path();
+    if let Some(p) = path {
+        if let Ok(content) = std::fs::read_to_string(&p) {
+            return Ok(content);
+        }
+    }
+    Ok(r#"{"language":"en","auto_start":false,"minimize_tray":true,"notify_connect":true,"ping_interval":1}"#.into())
+}
+
+#[tauri::command]
+fn save_split_rules(
+    mode: String,
+    processes: Vec<String>,
+    domains: Vec<String>,
+) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
+    config.split_mode = mode;
+    config.split_processes = processes;
+    config.split_domains = domains;
+    store.update_active_config(config).map_err(|e| e.to_string())?;
+    Ok("Split rules saved".into())
+}
+
+#[tauri::command]
+fn get_split_state(state: State<AppState>) -> Result<bool, String> {
+    Ok(*state.split_enabled.lock().unwrap())
+}
+
+#[tauri::command]
+fn set_split_state(state: State<AppState>, enabled: bool) -> Result<bool, String> {
+    let mut s = state.split_enabled.lock().unwrap();
+    *s = enabled;
+    if let Ok(mut store) = ProfileStore::load() {
+        if let Ok(mut config) = store.get_active_config() {
+            config.split_mode = if enabled { "exclude".into() } else { "off".into() };
+            store.update_active_config(config).ok();
+        }
+    }
+    Ok(enabled)
 }
