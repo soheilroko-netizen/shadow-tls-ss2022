@@ -36,23 +36,23 @@
     justify-content: space-between;
     padding: 8px 12px;
     flex-shrink: 0;
-    background: rgba(10, 10, 15, 0.85);
-    border-bottom: 1px solid rgba(245, 158, 11, 0.08);
+    background: rgba(10, 10, 15, 0.9);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.1);
   }
   .app-title {
     font-size: 16px;
     font-weight: 700;
     color: #f59e0b;
     letter-spacing: 1px;
-    text-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+    text-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
   }
   .split-btn, .menu-btn {
-    width: 34px;
-    height: 34px;
-    border: 1px solid rgba(245, 158, 11, 0.12);
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(245, 158, 11, 0.18);
     border-radius: 8px;
-    background: rgba(245, 158, 11, 0.04);
-    color: rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.06);
+    color: rgba(245, 158, 11, 0.5);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -61,16 +61,16 @@
     position: relative;
   }
   .split-btn:hover, .menu-btn:hover {
-    background: rgba(245, 158, 11, 0.1);
-    color: rgba(245, 158, 11, 0.7);
-    border-color: rgba(245, 158, 11, 0.25);
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.06);
+    background: rgba(245, 158, 11, 0.12);
+    color: rgba(245, 158, 11, 0.85);
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.08);
   }
   .split-btn.active {
     color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.3);
-    background: rgba(245, 158, 11, 0.08);
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.1);
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.12);
   }
   .split-indicator {
     position: absolute;
@@ -80,6 +80,6 @@
     height: 6px;
     border-radius: 50%;
     background: #f59e0b;
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
   }
 </style>

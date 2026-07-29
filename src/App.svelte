@@ -40,6 +40,7 @@
         connected = true
         connectStart = Date.now()
         startTimers()
+        startStatusPoll()
         addLog('Connected')
       } catch (e: any) {
         addLog('Connect failed: ' + String(e))
@@ -50,6 +51,7 @@
         connected = false
         connectStart = 0
         stopTimers()
+        stopStatusPoll()
         pingMs = null
         upBytes = 0
         downBytes = 0
@@ -58,6 +60,37 @@
         addLog('Disconnect failed: ' + String(e))
       }
     }
+  }
+
+  let statusPollInterval: ReturnType<typeof setInterval> | null = null
+
+  function startStatusPoll() {
+    stopStatusPoll()
+    statusPollInterval = setInterval(async () => {
+      try {
+        const status = await invoke<{ running: boolean; split: boolean }>('get_status')
+        if (status.running !== connected) {
+          connected = status.running
+          if (!connected) {
+            connectStart = 0
+            stopTimers()
+            stopStatusPoll()
+            pingMs = null
+            upBytes = 0
+            downBytes = 0
+            addLog('Connection lost')
+          } else if (connectStart === 0) {
+            connectStart = Date.now()
+            startTimers()
+          }
+        }
+      } catch {}
+    }, 2000)
+  }
+
+  function stopStatusPoll() {
+    if (statusPollInterval) clearInterval(statusPollInterval)
+    statusPollInterval = null
   }
 
   function startTimers() {
@@ -90,7 +123,7 @@
   async function pollTraffic() {
     if (!connected) return
     try {
-      const raw = await invoke<string>('get_total_traffic')
+      const raw = await invoke<string>('get_traffic')
       const data = JSON.parse(raw)
       upBytes = data.up ?? 0
       downBytes = data.down ?? 0

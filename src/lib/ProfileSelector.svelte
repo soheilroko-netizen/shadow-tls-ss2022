@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import { slide } from 'svelte/transition'
+  import { onMount } from 'svelte'
 
   let { profileName, onSwitch }: {
     profileName: string
@@ -10,12 +11,20 @@
   let open = $state(false)
   let profiles = $state<{ name: string }[]>([])
 
+  async function loadProfiles() {
+    try {
+      const store = await invoke<{ profiles: { name: string }[], active_profile: string }>('get_profiles')
+      profiles = store.profiles
+    } catch {}
+  }
+
+  onMount(() => {
+    loadProfiles()
+  })
+
   async function toggle() {
     if (!open) {
-      try {
-        const store = await invoke<{ profiles: { name: string }[], active_profile: string }>('get_profiles')
-        profiles = store.profiles
-      } catch {}
+      await loadProfiles()
     }
     open = !open
   }
@@ -30,7 +39,6 @@
   }
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="profile-wrap" tabindex="-1" onblur={handleBlur}>
   <button class="profile-selector" onclick={toggle} class:open>
     <div class="avatar">{(profileName[0] || '?').toUpperCase()}</div>
@@ -63,19 +71,19 @@
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: rgba(20, 20, 30, 0.85);
-    border: 1px solid rgba(245, 158, 11, 0.1);
+    background: rgba(20, 20, 30, 0.9);
+    border: 1px solid rgba(245, 158, 11, 0.15);
     border-radius: 10px;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.9);
     cursor: pointer;
     font-family: inherit;
     font-size: 13px;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
   }
   .profile-selector:hover, .profile-selector.open {
-    border-color: rgba(245, 158, 11, 0.25);
-    background: rgba(20, 20, 30, 0.92);
+    border-color: rgba(245, 158, 11, 0.3);
+    background: rgba(20, 20, 30, 0.95);
   }
   .avatar {
     width: 28px;
@@ -96,7 +104,7 @@
     font-weight: 500;
   }
   .arrow {
-    color: rgba(245, 158, 11, 0.5);
+    color: rgba(245, 158, 11, 0.6);
     transition: transform 0.2s;
   }
   .open .arrow {
@@ -107,11 +115,11 @@
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: rgba(15, 15, 22, 0.97);
-    border: 1px solid rgba(245, 158, 11, 0.1);
+    background: rgba(15, 15, 22, 0.98);
+    border: 1px solid rgba(245, 158, 11, 0.12);
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.55);
   }
   .dropdown-item {
     width: 100%;
@@ -119,19 +127,19 @@
     text-align: left;
     background: none;
     border: none;
-    color: rgba(255,255,255,0.8);
+    color: rgba(255,255,255,0.85);
     font-size: 13px;
     font-family: inherit;
     cursor: pointer;
     transition: all 0.1s;
   }
   .dropdown-item:hover {
-    background: rgba(245, 158, 11, 0.08);
+    background: rgba(245, 158, 11, 0.1);
     color: #f59e0b;
   }
   .dropdown-item.active {
     color: #f59e0b;
     font-weight: 500;
-    background: rgba(245, 158, 11, 0.05);
+    background: rgba(245, 158, 11, 0.06);
   }
 </style>

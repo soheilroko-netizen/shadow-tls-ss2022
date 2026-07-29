@@ -51,9 +51,6 @@ struct AppState {
     proxy: Mutex<ProxyManager>,
     started_at: Mutex<Option<Instant>>,
     split_enabled: Mutex<bool>,
-    // Store menu item handles for dynamic enable/disable
-    connect_item: Mutex<Option<tauri::menu::MenuItem>>,
-    disconnect_item: Mutex<Option<tauri::menu::MenuItem>>,
 }
 
 // ── Settings Window ─────────────────────────────────────────────────
@@ -93,12 +90,14 @@ fn update_tray_state(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
     let running = state.proxy.lock().unwrap().is_running();
     
-    // Use stored handles for enable/disable
-    if let Some(connect_item) = state.connect_item.lock().unwrap().as_ref() {
-        let _ = connect_item.set_enabled(!running);
-    }
-    if let Some(disconnect_item) = state.disconnect_item.lock().unwrap().as_ref() {
-        let _ = disconnect_item.set_enabled(running);
+    // Get menu items by ID from the app menu
+    if let Some(menu) = app.menu() {
+        if let Some(connect_item) = menu.get("connect") {
+            let _ = connect_item.set_enabled(!running);
+        }
+        if let Some(disconnect_item) = menu.get("disconnect") {
+            let _ = disconnect_item.set_enabled(running);
+        }
     }
 }
 

@@ -27,20 +27,20 @@
 <style>
   .data-card {
     flex: 1;
-    background: rgba(15, 15, 22, 0.7);
-    border: 1px solid rgba(245, 158, 11, 0.1);
+    background: rgba(20, 20, 28, 0.85);
+    border: 1px solid rgba(245, 158, 11, 0.15);
     border-radius: 12px;
     padding: 12px 14px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
     transition: all 0.2s;
   }
   .data-card:hover {
-    border-color: rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.25);
   }
   .card-label {
     font-size: 9px;
     font-weight: 600;
-    color: rgba(245, 158, 11, 0.75);
+    color: #f59e0b;
     letter-spacing: 1.5px;
     margin-bottom: 6px;
   }
@@ -60,8 +60,8 @@
   .data-arrow.down { color: #d97706; }
   .data-val {
     font-size: 16px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.9);
+    font-weight: 400;
+    color: rgba(255,255,255,0.95);
     font-variant-numeric: tabular-nums;
   }
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
 
   let { connected, onClick }: {
     connected: boolean
@@ -8,26 +8,41 @@
 
   let btnRef = $state<HTMLButtonElement>()
   let ringRef = $state<HTMLDivElement>()
-  let rotate = $state(0)
-  let glowScale = $state(1)
-  let animFrame: number
+  let animFrame: number | null = null
 
-  function animate() {
-    rotate = (rotate + 1.2) % 360
-    glowScale = 1 + Math.sin(Date.now() / 1200) * 0.04
-    if (ringRef) {
-      ringRef.style.transform = `rotate(${rotate}deg)`
-    }
-    if (btnRef) {
-      btnRef.style.transform = `scale(${glowScale})`
+  // Only animate rings when connected - use CSS animation instead of rAF loop
+  function startAnimation() {
+    if (animFrame) return
+    function animate() {
+      if (ringRef) {
+        ringRef.style.transform = `rotate(${(Date.now() / 20) % 360}deg)`
+      }
+      animFrame = requestAnimationFrame(animate)
     }
     animFrame = requestAnimationFrame(animate)
   }
 
-  onMount(() => {
-    animFrame = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(animFrame)
+  function stopAnimation() {
+    if (animFrame) {
+      cancelAnimationFrame(animFrame)
+      animFrame = null
+    }
+  }
+
+  $effect(() => {
+    if (connected) {
+      startAnimation()
+    } else {
+      stopAnimation()
+      if (ringRef) ringRef.style.transform = 'rotate(0deg)'
+    }
   })
+
+  onMount(() => {
+    if (connected) startAnimation()
+  })
+
+  onDestroy(() => stopAnimation())
 </script>
 
 <button class="power-wrap" class:connected onclick={onClick} bind:this={btnRef}>
@@ -71,6 +86,9 @@
     border-radius: 50%;
     pointer-events: none;
     transition: all 0.3s;
+  }
+  .connected .ring-outer {
+    animation: ringRotate 12s linear infinite;
   }
   .ring-segment {
     position: absolute;
@@ -141,5 +159,10 @@
   }
   .connected .glow-layer {
     opacity: 1;
+  }
+
+  @keyframes ringRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>

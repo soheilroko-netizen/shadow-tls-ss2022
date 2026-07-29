@@ -37,6 +37,19 @@
         "transparent": true,
         "center": true,
         "visible": false
+      },
+      {
+        "label": "settings",
+        "title": "dakal-tls Settings",
+        "width": 720,
+        "height": 500,
+        "minWidth": 600,
+        "minHeight": 450,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {

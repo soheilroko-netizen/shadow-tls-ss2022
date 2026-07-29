@@ -61,26 +61,26 @@
 <style>
   .ping-card {
     flex: 1;
-    background: rgba(15, 15, 22, 0.7);
-    border: 1px solid rgba(245, 158, 11, 0.1);
+    background: rgba(20, 20, 28, 0.85);
+    border: 1px solid rgba(245, 158, 11, 0.15);
     border-radius: 12px;
     padding: 12px 14px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
     transition: all 0.2s;
   }
   .ping-card:hover {
-    border-color: rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.25);
   }
   .card-label {
     font-size: 9px;
     font-weight: 600;
-    color: rgba(245, 158, 11, 0.75);
+    color: #f59e0b;
     letter-spacing: 1.5px;
     margin-bottom: 2px;
   }
   .ping-value {
     font-size: 22px;
-    font-weight: 300;
+    font-weight: 400;
     color: #f59e0b;
     font-variant-numeric: tabular-nums;
     margin-bottom: 4px;
