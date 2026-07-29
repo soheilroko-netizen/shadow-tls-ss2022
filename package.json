@@ -3,7 +3,7 @@
   "version": "9.0.0",
   "type": "module",
   "scripts": {
-    "build": "mkdir -p dist && cp public/index.html dist/index.html && if exist public\"*.woff2 (copy public\"*.woff2 dist/) else (echo no fonts)"
+    "build": "mkdir -p dist && copy /Y index.html dist\\index.html 2>nul || cp index.html dist/index.html"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0"
