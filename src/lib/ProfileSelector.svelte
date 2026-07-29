@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
+  import { slide } from 'svelte/transition'
 
   let { profileName, onSwitch }: {
     profileName: string
@@ -29,7 +30,8 @@
   }
 </script>
 
-<div class="profile-wrap" onblur={handleBlur}>
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div class="profile-wrap" tabindex="-1" onblur={handleBlur}>
   <button class="profile-selector" onclick={toggle} class:open>
     <div class="avatar">{(profileName[0] || '?').toUpperCase()}</div>
     <span class="pname">{profileName}</span>
@@ -38,7 +40,7 @@
     </svg>
   </button>
   {#if open}
-    <div class="dropdown" transition:slide>
+    <div class="dropdown" transition:slide={{ duration: 150 }}>
       {#each profiles as p}
         <button class="dropdown-item" class:active={p.name === profileName} onclick={() => select(p.name)}>
           {p.name}
@@ -61,11 +63,10 @@
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
-    background: rgba(20, 20, 30, 0.6);
-    backdrop-filter: blur(8px);
+    background: rgba(20, 20, 30, 0.85);
     border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 10px;
-    color: rgba(255,255,255,0.8);
+    color: rgba(255,255,255,0.85);
     cursor: pointer;
     font-family: inherit;
     font-size: 13px;
@@ -74,7 +75,7 @@
   }
   .profile-selector:hover, .profile-selector.open {
     border-color: rgba(245, 158, 11, 0.25);
-    background: rgba(20, 20, 30, 0.8);
+    background: rgba(20, 20, 30, 0.92);
   }
   .avatar {
     width: 28px;
@@ -95,7 +96,7 @@
     font-weight: 500;
   }
   .arrow {
-    color: rgba(245, 158, 11, 0.3);
+    color: rgba(245, 158, 11, 0.5);
     transition: transform 0.2s;
   }
   .open .arrow {
@@ -106,12 +107,11 @@
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: rgba(15, 15, 22, 0.95);
-    backdrop-filter: blur(12px);
+    background: rgba(15, 15, 22, 0.97);
     border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
   }
   .dropdown-item {
     width: 100%;
@@ -119,7 +119,7 @@
     text-align: left;
     background: none;
     border: none;
-    color: rgba(255,255,255,0.65);
+    color: rgba(255,255,255,0.8);
     font-size: 13px;
     font-family: inherit;
     cursor: pointer;

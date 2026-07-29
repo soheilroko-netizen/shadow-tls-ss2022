@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import { getCurrentWindow } from '@tauri-apps/api/window'
   import TopBar from './lib/TopBar.svelte'
   import PowerButton from './lib/PowerButton.svelte'
   import ProfileSelector from './lib/ProfileSelector.svelte'
@@ -51,6 +50,9 @@
         connected = false
         connectStart = 0
         stopTimers()
+        pingMs = null
+        upBytes = 0
+        downBytes = 0
         addLog('Disconnected')
       } catch (e: any) {
         addLog('Disconnect failed: ' + String(e))
@@ -77,7 +79,7 @@
   }
 
   function updateTimer() {
-    if (!connectStart) return
+    if (connectStart === 0) return
     const elapsed = Math.floor((Date.now() - connectStart) / 1000)
     const h = String(Math.floor(elapsed / 3600)).padStart(2, '0')
     const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0')
@@ -90,8 +92,8 @@
     try {
       const raw = await invoke<string>('get_total_traffic')
       const data = JSON.parse(raw)
-      upBytes = data.up || 0
-      downBytes = data.down || 0
+      upBytes = data.up ?? 0
+      downBytes = data.down ?? 0
     } catch {}
   }
 
@@ -99,8 +101,8 @@
     if (!connected) return
     try {
       const raw = await invoke<string>('real_ping')
-      const ms = parseInt(raw)
-      if (!isNaN(ms)) pingMs = ms
+      const ms = parseInt(String(raw).replace('ms', '').trim())
+      if (!isNaN(ms) && ms > 0) pingMs = ms
     } catch {}
   }
 
@@ -130,6 +132,9 @@
       connected = false
       connectStart = 0
       stopTimers()
+      pingMs = null
+      upBytes = 0
+      downBytes = 0
       addLog('Switched to: ' + name)
     } catch (e: any) {
       addLog('Switch failed: ' + String(e))
@@ -138,7 +143,7 @@
 
   function addLog(msg: string) {
     const ts = new Date().toLocaleTimeString()
-    logLines = [...logLines, `${ts} ${msg}`]
+    logLines = [...logLines.slice(-200), `${ts} ${msg}`]
   }
 
   function clearLog() {
@@ -154,7 +159,9 @@
     <div class="status-line">
       <span class="status-dot"></span>
       <span class="status-text">{connected ? 'CONNECTED' : 'Disconnected'}</span>
-      <span class="session-time">{sessionTime}</span>
+      {#if connected}
+        <span class="session-time">{sessionTime}</span>
+      {/if}
     </div>
     <ProfileSelector {profileName} onSwitch={handleProfileSwitch} />
     <div class="cards-row">
@@ -174,19 +181,19 @@
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    background: #0a0a0f;
   }
   .bg {
     position: fixed;
     inset: 0;
     z-index: 0;
-    background: #0a0a0f;
+    pointer-events: none;
   }
   .bg::after {
     content: '';
     position: absolute;
     inset: 0;
     background: radial-gradient(ellipse at 50% 30%, rgba(245, 158, 11, 0.04) 0%, transparent 70%);
-    pointer-events: none;
   }
   .dashboard {
     position: relative;
@@ -204,25 +211,25 @@
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.55);
-    letter-spacing: 1px;
-    margin-top: -4px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.5px;
+    margin-top: -2px;
   }
   .status-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.2);
     transition: all 0.3s;
   }
   .connected .status-dot {
     background: #f59e0b;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
   }
   .status-text {
     text-transform: uppercase;
-    font-weight: 500;
+    font-weight: 600;
     transition: color 0.3s;
   }
   .connected .status-text {
@@ -230,8 +237,8 @@
   }
   .session-time {
     font-size: 13px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.4);
+    font-weight: 400;
+    color: rgba(255,255,255,0.7);
     font-variant-numeric: tabular-nums;
     letter-spacing: 1px;
   }

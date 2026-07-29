@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount } from 'svelte'
 
   let { pingMs }: { pingMs: number | null } = $props()
 
@@ -7,7 +7,7 @@
   const MAX = 60
 
   let canvas: HTMLCanvasElement
-  let ctx: CanvasRenderingContext2D | null
+  let ctx: CanvasRenderingContext2D | null = null
 
   $effect(() => {
     if (pingMs !== null) {
@@ -40,42 +40,41 @@
     ctx.lineTo(0, h)
     ctx.closePath()
     const grad = ctx.createLinearGradient(0, 0, 0, h)
-    grad.addColorStop(0, 'rgba(245, 158, 11, 0.1)')
+    grad.addColorStop(0, 'rgba(245, 158, 11, 0.15)')
     grad.addColorStop(1, 'rgba(245, 158, 11, 0)')
     ctx.fillStyle = grad
     ctx.fill()
   }
 
   onMount(() => {
-    canvas = document.getElementById('ping-canvas') as HTMLCanvasElement
-    ctx = canvas?.getContext('2d') || null
+    ctx = canvas?.getContext('2d') ?? null
+    draw()
   })
 </script>
 
 <div class="ping-card">
   <div class="card-label">PING</div>
   <div class="ping-value">{pingMs !== null ? `${pingMs} ms` : '—'}</div>
-  <canvas id="ping-canvas" class="ping-graph" width="140" height="36"></canvas>
+  <canvas bind:this={canvas} class="ping-graph" width="140" height="36"></canvas>
 </div>
 
 <style>
   .ping-card {
     flex: 1;
-    background: rgba(15, 15, 22, 0.5);
-    backdrop-filter: blur(6px);
-    border: 1px solid rgba(245, 158, 11, 0.06);
+    background: rgba(15, 15, 22, 0.7);
+    border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 12px;
     padding: 12px 14px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.15);
     transition: all 0.2s;
   }
   .ping-card:hover {
-    border-color: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.18);
   }
   .card-label {
     font-size: 9px;
     font-weight: 600;
-    color: rgba(245, 158, 11, 0.4);
+    color: rgba(245, 158, 11, 0.75);
     letter-spacing: 1.5px;
     margin-bottom: 2px;
   }

@@ -1,7 +1,7 @@
 name: Tauri Build
 on:
   push:
-    branches: [main, v2, v4, v5, v6, v7, v9]
+    branches: [main, v2, v4, v5, v6, v7, v9, v9-*, v9-fix-509664a]
   pull_request:
     branches: [main, v2, v4, v5, v6, v7, v9]
 
@@ -48,7 +48,7 @@ jobs:
         run: npm run build
 
       - name: Tauri build
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

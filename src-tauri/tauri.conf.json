@@ -24,10 +24,23 @@
     }
   },
   "app": {
-    "windows": [],
+    "windows": [
+      {
+        "label": "main",
+        "title": "dakal-tls",
+        "width": 420,
+        "height": 600,
+        "minWidth": 420,
+        "minHeight": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "center": true,
+        "visible": false
+      }
+    ],
     "security": {
-      "csp": null,
-      "capabilities": ["default"]
+      "csp": "default-src 'self' https://tauri.localhost data: blob:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://tauri.localhost; style-src 'self' 'unsafe-inline' https://tauri.localhost; img-src 'self' data: blob: https://tauri.localhost; connect-src 'self' https://tauri.localhost; font-src 'self' data: https://tauri.localhost;"
     }
   }
 }

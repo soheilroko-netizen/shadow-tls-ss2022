@@ -4,14 +4,10 @@
     onToggle: () => void
     onSettings: () => void
   } = $props()
-
-  let splitHover = $state(false)
 </script>
 
 <header class="top-bar">
   <button class="split-btn {splitActive ? 'active' : ''}" onclick={onToggle}
-    onmouseenter={() => splitHover = true}
-    onmouseleave={() => splitHover = false}
     title="Split tunnel toggle">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18">
       <path d="M2 10h5l2-3 2 6 2-3 5 0"/>
@@ -25,8 +21,8 @@
   <span class="app-title">dakal-tls</span>
 
   <button class="menu-btn" onclick={onSettings} title="Settings">
-    <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-      <path d="M3 5h14M3 10h14M3 15h14"/>
+    <svg viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="16">
+      <path d="M2 2h16M2 8h16M2 14h16"/>
     </svg>
   </button>
 </header>
@@ -40,8 +36,7 @@
     justify-content: space-between;
     padding: 8px 12px;
     flex-shrink: 0;
-    background: rgba(10, 10, 15, 0.6);
-    backdrop-filter: blur(8px);
+    background: rgba(10, 10, 15, 0.85);
     border-bottom: 1px solid rgba(245, 158, 11, 0.08);
   }
   .app-title {
