@@ -3,9 +3,6 @@
   "version": "9.0.0",
   "type": "module",
   "scripts": {
-    "build": "mkdir -p dist && copy /Y index.html dist\\index.html 2>nul || cp index.html dist/index.html"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0"
+    "build": "mkdir -p dist && cp public/index.html dist/index.html"
   }
 }

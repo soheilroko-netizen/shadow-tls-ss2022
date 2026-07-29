@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dakal-tls</title>
+<style>
+*{margin:0;padding:0}
+html,body{height:100%;background:#0a0a0f}
+body{display:flex;color:#ccc;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px}
+#app{width:430px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+h1{color:#fbbf24;font-size:18px;font-weight:700;letter-spacing:1px}
+.btn{width:96px;height:96px;border-radius:50%;border:2px solid #333;background:#1a1a26;color:#555;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.btn:hover{border-color:#f59e0b44;color:#f59e0b88}
+.on{border-color:#f59e0b;color:#f59e0b}
+#st{font-size:13px;color:#888}
+#st.ok{color:#22c55e}
+.card{background:#12121a;border:1px solid #222;border-radius:8px;padding:12px 16px;width:100%}
+.cv{font-size:20px;font-weight:700;color:#e4e4ec}
+.cl{font-size:10px;text-transform:uppercase;color:#666;letter-spacing:1px}
+.row{display:flex;gap:8px;width:100%}
+.row .card{flex:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>dakal-tls</h1>
+  <button class="btn" id="pb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="26" height="26"><circle cx="12" cy="12" r="9"/><path d="M12 4v8"/></svg></button>
+  <span id="st">Disconnected</span>
+  <div class="row">
+    <div class="card"><div class="cl">DL</div><div class="cv" id="dl">0</div></div>
+    <div class="card"><div class="cl">UL</div><div class="cv" id="ul">0</div></div>
+  </div>
+</div>
+<script>
+const i=window.__TAURI__?window.__TAURI__.invoke:async()=>null;
+let c=false;
+const pb=document.getElementById('pb'),st=document.getElementById('st'),dl=document.getElementById('dl'),ul=document.getElementById('ul');
+async function poll(){
+  try{c=await i('get_status')}catch(e){}
+  pb.className='btn'+(c?' on':'');st.className=c?'ok':'';st.textContent=c?'Connected':'Disconnected';
+}
+async function traffic(){
+  if(!c)return;
+  try{
+    const t=await i('get_total_traffic',{});
+    if(t){const p=t.split(':');if(p.length>=2){dl.textContent=p[0];ul.textContent=p[1]}}
+  }catch(e){}
+}
+pb.onclick=async()=>{
+  try{if(c)await i('stop_proxy');else await i('start_proxy');c=!c;poll()}catch(e){}
+};
+setInterval(()=>{poll();traffic()},2000);
+poll();
+</script>
+</body>
+</html>
