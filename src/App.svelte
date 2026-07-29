@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
-  import { getCurrentWindow } from '@tauri-apps/api/window'
   import TopBar from './lib/TopBar.svelte'
   import PowerButton from './lib/PowerButton.svelte'
   import ProfileSelector from './lib/ProfileSelector.svelte'
@@ -11,74 +10,92 @@
   let connected = $state(false)
   let profileName = $state('Germany 1')
   let sessionTime = $state('00:00:00')
-  let connectStart = $state<number>(0)
+  let connectTime = $state(0)
   let logLines = $state<string[]>([])
   let upBytes = $state(0)
   let downBytes = $state(0)
   let pingMs = $state<number | null>(null)
   let splitActive = $state(false)
 
-  let timerInterval: ReturnType<typeof setInterval> | null = null
-  let trafficInterval: ReturnType<typeof setInterval> | null = null
-  let pingInterval: ReturnType<typeof setInterval> | null = null
+  let timerHandle: ReturnType<typeof setInterval> | null = null
+  let trafficHandle: ReturnType<typeof setInterval> | null = null
+  let pingHandle: ReturnType<typeof setInterval> | null = null
 
   async function loadInit() {
     try {
       const split = await invoke<boolean>('get_split_state')
       splitActive = split
-    } catch {}
+    } catch (e) { console.error('split init', e) }
     try {
       const store = await invoke<{ profiles: { name: string }[], active_profile: string }>('get_profiles')
       profileName = store.active_profile
-    } catch {}
+    } catch (e) { console.error('profile init', e) }
   }
   loadInit()
 
-  async function handleConnect() {
-    if (!connected) {
-      try {
-        await invoke('start_proxy')
+  // ── Poll initial status ──
+  (async () => {
+    try {
+      const alive = await invoke<boolean>('get_status')
+      if (alive) {
         connected = true
-        connectStart = Date.now()
+        connectTime = Date.now()
         startTimers()
-        addLog('Connected')
-      } catch (e: any) {
-        addLog('Connect failed: ' + String(e))
+        addLog('Already connected')
       }
-    } else {
+    } catch {}
+  })()
+
+  async function handleConnect() {
+    if (connected) {
+      // DISCONNECT
       try {
         await invoke('stop_proxy')
         connected = false
-        connectStart = 0
+        connectTime = 0
+        sessionTime = '00:00:00'
         stopTimers()
         addLog('Disconnected')
+        pingMs = null
+        upBytes = 0
+        downBytes = 0
       } catch (e: any) {
         addLog('Disconnect failed: ' + String(e))
+      }
+    } else {
+      // CONNECT
+      try {
+        await invoke('start_proxy')
+        connected = true
+        connectTime = Date.now()
+        startTimers()
+        addLog('Connected')
+        // Immediate polls
+        pollTraffic()
+        pollPing()
+      } catch (e: any) {
+        addLog('Connect failed: ' + String(e))
       }
     }
   }
 
   function startTimers() {
     stopTimers()
-    timerInterval = setInterval(updateTimer, 1000)
-    trafficInterval = setInterval(pollTraffic, 1000)
-    pingInterval = setInterval(pollPing, 1000)
+    timerHandle = setInterval(updateTimer, 1000)
+    trafficHandle = setInterval(pollTraffic, 1000)
+    pingHandle = setInterval(pollPing, 1000)
     updateTimer()
-    pollTraffic()
-    pollPing()
   }
 
   function stopTimers() {
-    if (timerInterval) clearInterval(timerInterval)
-    if (trafficInterval) clearInterval(trafficInterval)
-    if (pingInterval) clearInterval(pingInterval)
-    timerInterval = trafficInterval = pingInterval = null
-    sessionTime = '00:00:00'
+    if (timerHandle !== null) { clearInterval(timerHandle); timerHandle = null }
+    if (trafficHandle !== null) { clearInterval(trafficHandle); trafficHandle = null }
+    if (pingHandle !== null) { clearInterval(pingHandle); pingHandle = null }
   }
 
   function updateTimer() {
-    if (!connectStart) return
-    const elapsed = Math.floor((Date.now() - connectStart) / 1000)
+    if (!connectTime) return
+    const elapsed = Math.floor((Date.now() - connectTime) / 1000)
     const h = String(Math.floor(elapsed / 3600)).padStart(2, '0')
     const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0')
     const s = String(elapsed % 60).padStart(2, '0')
@@ -88,49 +105,67 @@
   async function pollTraffic() {
     if (!connected) return
     try {
+      // Try total (connections API) first
       const raw = await invoke<string>('get_total_traffic')
-      const data = JSON.parse(raw)
-      upBytes = data.up || 0
-      downBytes = data.down || 0
-    } catch {}
+      const d = JSON.parse(raw)
+      if (d.up !== undefined) {
+        upBytes = d.up
+        downBytes = d.down
+      }
+    } catch {
+      // Fallback: live traffic API
+      try {
+        const raw2 = await invoke<string>('get_traffic')
+        const d2 = JSON.parse(raw2)
+        if (d2.up !== undefined) {
+          upBytes = d2.up
+          downBytes = d2.down
+        }
+      } catch {}
+    }
   }
 
   async function pollPing() {
     if (!connected) return
     try {
       const raw = await invoke<string>('real_ping')
-      const ms = parseInt(raw)
-      if (!isNaN(ms)) pingMs = ms
+      const val = parseInt(raw)
+      if (!isNaN(val)) pingMs = val
     } catch {}
   }
 
-  async function handleSplitToggle() {
+  function handleSplitToggle() {
     splitActive = !splitActive
-    try {
-      await invoke('set_split_state', { enabled: splitActive })
-      addLog(splitActive ? 'Split tunnel ON' : 'Split tunnel OFF')
-    } catch (e: any) {
+    invoke('set_split_state', { enabled: splitActive }).catch((e: any) => {
       splitActive = !splitActive
       addLog('Split toggle failed: ' + String(e))
-    }
+    })
+    addLog(splitActive ? 'Split ON' : 'Split OFF')
   }
 
   async function handleOpenSettings() {
     try {
       await invoke('show_settings')
     } catch (e: any) {
-      addLog('Settings failed: ' + String(e))
+      addLog('Settings error: ' + String(e))
     }
   }
 
   async function handleProfileSwitch(name: string) {
+    const wasConnected = connected
     try {
       await invoke('switch_profile_stop', { name })
       profileName = name
-      connected = false
-      connectStart = 0
-      stopTimers()
-      addLog('Switched to: ' + name)
+      if (wasConnected) {
+        connected = false
+        connectTime = 0
+        sessionTime = '00:00:00'
+        stopTimers()
+        pingMs = null
+        upBytes = 0
+        downBytes = 0
+      }
+      addLog('Profile: ' + name)
     } catch (e: any) {
       addLog('Switch failed: ' + String(e))
     }
@@ -138,7 +173,7 @@
 
   function addLog(msg: string) {
     const ts = new Date().toLocaleTimeString()
-    logLines = [...logLines, `${ts} ${msg}`]
+    logLines = [...logLines.slice(-200), `${ts} ${msg}`]
   }
 
   function clearLog() {
@@ -154,7 +189,9 @@
     <div class="status-line">
       <span class="status-dot"></span>
       <span class="status-text">{connected ? 'CONNECTED' : 'Disconnected'}</span>
-      <span class="session-time">{sessionTime}</span>
+      {#if connected}
+        <span class="session-time">{sessionTime}</span>
+      {/if}
     </div>
     <ProfileSelector {profileName} onSwitch={handleProfileSwitch} />
     <div class="cards-row">
@@ -174,19 +211,19 @@
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    background: #0a0a0f;
   }
   .bg {
     position: fixed;
     inset: 0;
     z-index: 0;
-    background: #0a0a0f;
+    pointer-events: none;
   }
   .bg::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at 50% 30%, rgba(245, 158, 11, 0.04) 0%, transparent 70%);
-    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 30%, rgba(245, 158, 11, 0.07) 0%, transparent 70%);
   }
   .dashboard {
     position: relative;
@@ -195,8 +232,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 16px 0;
-    gap: 8px;
+    padding: 8px 16px 0;
+    gap: 10px;
     overflow-y: auto;
   }
   .status-line {
@@ -204,43 +241,44 @@
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    font-weight: 400;
-    color: rgba(255,255,255,0.55);
-    letter-spacing: 1px;
-    margin-top: -4px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.5px;
+    margin-top: 2px;
   }
   .status-dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.2);
     transition: all 0.3s;
   }
   .connected .status-dot {
     background: #f59e0b;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 14px rgba(245, 158, 11, 0.7);
   }
   .status-text {
     text-transform: uppercase;
-    font-weight: 500;
+    font-weight: 600;
     transition: color 0.3s;
   }
   .connected .status-text {
-    color: #f59e0b;
+    color: #fbbf24;
+    text-shadow: 0 0 8px rgba(245,158,11,0.15);
   }
   .session-time {
     font-size: 13px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.4);
+    font-weight: 400;
+    color: rgba(255,255,255,0.5);
     font-variant-numeric: tabular-nums;
     letter-spacing: 1px;
+    margin-left: 4px;
   }
   .cards-row {
     display: flex;
     gap: 10px;
     width: 100%;
     max-width: 400px;
-    margin-top: 4px;
   }
   .future-area {
     flex: 1;

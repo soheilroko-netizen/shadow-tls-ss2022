@@ -14,55 +14,58 @@
 
 <div class="data-card">
   <div class="card-label">DATA USAGE</div>
-  <div class="data-row">
-    <span class="data-arrow up">↑</span>
-    <span class="data-val">{fmt(upBytes)}</span>
-  </div>
-  <div class="data-row">
-    <span class="data-arrow down">↓</span>
-    <span class="data-val">{fmt(downBytes)}</span>
+  <div class="data-body">
+    <div class="data-row">
+      <span class="arrow up">↑</span>
+      <span class="val">{fmt(upBytes)}</span>
+    </div>
+    <div class="data-row">
+      <span class="arrow down">↓</span>
+      <span class="val">{fmt(downBytes)}</span>
+    </div>
   </div>
 </div>
 
 <style>
   .data-card {
     flex: 1;
-    background: rgba(15, 15, 22, 0.5);
+    background: rgba(20, 20, 30, 0.6);
     backdrop-filter: blur(6px);
-    border: 1px solid rgba(245, 158, 11, 0.06);
+    border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 12px;
     padding: 12px 14px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-    transition: all 0.2s;
-  }
-  .data-card:hover {
-    border-color: rgba(245, 158, 11, 0.12);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
   }
   .card-label {
-    font-size: 9px;
-    font-weight: 600;
-    color: rgba(245, 158, 11, 0.4);
+    font-size: 10px;
+    font-weight: 700;
+    color: #fbbf24;
     letter-spacing: 1.5px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    opacity: 0.9;
+  }
+  .data-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
   .data-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 2px 0;
+    gap: 8px;
   }
-  .data-arrow {
-    font-size: 12px;
+  .arrow {
+    font-size: 14px;
     font-weight: 700;
-    width: 16px;
+    width: 18px;
     text-align: center;
   }
-  .data-arrow.up { color: #f59e0b; }
-  .data-arrow.down { color: #d97706; }
-  .data-val {
-    font-size: 16px;
-    font-weight: 300;
-    color: rgba(255,255,255,0.8);
+  .arrow.up { color: #f59e0b; }
+  .arrow.down { color: #fbbf24; }
+  .val {
+    font-size: 18px;
+    font-weight: 400;
+    color: rgba(255,255,255,0.9);
     font-variant-numeric: tabular-nums;
   }
 </style>

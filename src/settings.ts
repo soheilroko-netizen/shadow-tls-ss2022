@@ -1,3 +1,4 @@
+import './styles.css'
 import { mount } from 'svelte'
 import Settings from './Settings.svelte'
 
