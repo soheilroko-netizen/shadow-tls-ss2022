@@ -113,6 +113,13 @@ impl Config {
     }
 }
 
+pub fn app_settings_path() -> Option<std::path::PathBuf> {
+    let proj_dirs = directories::ProjectDirs::from("com", "stls", "dakal-tls")?;
+    let config_dir = proj_dirs.config_dir();
+    std::fs::create_dir_all(config_dir).ok()?;
+    Some(config_dir.join("app_settings.json"))
+}
+
 impl ProfileStore {
     fn profiles_path() -> Result<PathBuf> {
         let proj_dirs = ProjectDirs::from("com", "stls", "stls")

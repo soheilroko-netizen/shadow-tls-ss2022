@@ -1,8 +1,7 @@
-// main.rs - Tauri app entry with commands
+// main.rs - Tauri app entry with commands (v9)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 // ── Single-instance guard via named mutex (Windows) ──────────────────
-// Prevents launching a second instance while one is already running.
 #[cfg(target_os = "windows")]
 fn check_single_instance() {
     use std::ffi::CString;
@@ -48,6 +47,7 @@ mod sysdns;
 struct AppState {
     proxy: Mutex<ProxyManager>,
     started_at: Mutex<Option<Instant>>,
+    split_enabled: Mutex<bool>,
 }
 
 // ── Tray menu rebuild helper ───────────────────────────────────
@@ -200,14 +200,14 @@ fn get_traffic() -> Result<String, String> {
     use std::time::Duration;
 
     let mut stream = TcpStream::connect_timeout(
-        &"127.0.0.1:9097".parse().map_err(|e| format!("addr: {}", e))?,
+        &"127.0.0.1:9097".parse().map_err(|e| format!("addr: {e}"))?,
         Duration::from_secs(2),
     )
-    .map_err(|e| format!("connect: {}", e))?;
+    .map_err(|e| format!("connect: {e}"))?;
 
     stream
         .set_read_timeout(Some(Duration::from_millis(800)))
-        .map_err(|e| format!("set_read_timeout: {}", e))?;
+        .map_err(|e| format!("set_read_timeout: {e}"))?;
 
     let req = "GET /traffic HTTP/1.1\r\nHost: 127.0.0.1:9097\r\nAuthorization: Bearer dakal\r\nConnection: close\r\n\r\n";
     stream
@@ -229,7 +229,7 @@ fn get_traffic() -> Result<String, String> {
             {
                 continue;
             }
-            Err(e) => return Err(format!("read: {}", e)),
+            Err(e) => return Err(format!("read: {e}")),
         }
     }
 
@@ -263,14 +263,11 @@ fn get_total_traffic() -> Result<String, String> {
         Err(_) => return Ok(r#"{"up":0,"down":0}"#.into()),
     };
 
-    stream
-        .set_read_timeout(Some(Duration::from_millis(800)))
-        .ok();
+    stream.set_read_timeout(Some(Duration::from_millis(800))).ok();
 
     let req = "GET /connections HTTP/1.1\r\nHost: 127.0.0.1:9097\r\nAuthorization: Bearer dakal\r\nConnection: close\r\n\r\n";
     let _ = stream.write_all(req.as_bytes());
 
-    // Read response in chunks for up to 1.5s
     let deadline = Instant::now() + Duration::from_millis(1500);
     let mut response = String::new();
     let mut buf = [0u8; 2048];
@@ -285,7 +282,6 @@ fn get_total_traffic() -> Result<String, String> {
         }
     }
 
-    // Parse HTTP response body after \r\n\r\n
     if let Some(body) = response.split("\r\n\r\n").nth(1) {
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
             let up = v["upload_total"].as_u64().unwrap_or(0);
@@ -296,6 +292,7 @@ fn get_total_traffic() -> Result<String, String> {
 
     Ok(r#"{"up":0,"down":0}"#.into())
 }
+
 #[tauri::command]
 fn get_uptime(state: State<AppState>) -> Result<u64, String> {
     let guard = state.started_at.lock().unwrap();
@@ -316,52 +313,25 @@ fn get_log(state: State<AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn get_ping(state: State<AppState>) -> Result<u64, String> {
-    let running = state.proxy.lock().unwrap().is_running();
-    if !running {
-        return Err("Not connected".into());
-    }
-    // Use local Clash API ping from /traffic endpoint
-    // Simple approach: return a dummy value for now
-    Ok(42)
-}
-
-#[tauri::command]
-fn save_app_settings(language: String, auto_start: bool, minimize_tray: bool, notify_connect: bool, ping_interval: u32) -> Result<String, String> {
-    Ok("Settings saved".into())
-}
-
-#[tauri::command]
-fn save_split_rules(mode: String, processes: Vec<String>, domains: Vec<String>) -> Result<String, String> {
-    // Load current config, update split rules
-    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
-    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
-    config.split_mode = mode;
-    // Store processes and domains (would need Config struct update)
-    store.update_active_config(config).map_err(|e| e.to_string())?;
-    Ok("Split rules saved".into())
-}
-
-#[tauri::command]
 fn real_ping(state: State<AppState>) -> Result<String, String> {
     let running = state.proxy.lock().unwrap().is_running();
     if !running {
         return Err("VPN not connected".into());
     }
+    drop(state);
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(3))
         .build()
-        .map_err(|e| format!("http client: {}", e))?;
+        .map_err(|e| format!("http client: {e}"))?;
 
     let target = "http://www.gstatic.com/generate_204";
 
-    if let Err(e) = client.get(target).send() {
-        return Err(format!("warmup failed: {}", e));
-    }
+    // warmup
+    let _ = client.get(target).send();
 
     let start = Instant::now();
-    let resp = client.get(target).send().map_err(|e| format!("measure failed: {}", e))?;
+    let resp = client.get(target).send().map_err(|e| format!("measure failed: {e}"))?;
     if !resp.status().is_success() && resp.status().as_u16() != 204 {
         return Err(format!("bad status: {}", resp.status()));
     }
@@ -371,10 +341,104 @@ fn real_ping(state: State<AppState>) -> Result<String, String> {
     Ok(format!("{}ms", ms))
 }
 
+#[tauri::command]
+fn save_app_settings(language: String, auto_start: bool, minimize_tray: bool, notify_connect: bool, ping_interval: u32) -> Result<String, String> {
+    // Persist to a simple app settings file
+    let settings = serde_json::json!({
+        "language": language,
+        "auto_start": auto_start,
+        "minimize_tray": minimize_tray,
+        "notify_connect": notify_connect,
+        "ping_interval": ping_interval,
+    });
+    let path = config::app_settings_path();
+    if let Some(p) = path {
+        std::fs::write(p, serde_json::to_string_pretty(&settings).unwrap()).ok();
+    }
+    Ok("Settings saved".into())
+}
+
+#[tauri::command]
+fn load_app_settings() -> Result<String, String> {
+    let path = config::app_settings_path();
+    if let Some(p) = path {
+        if let Ok(content) = std::fs::read_to_string(&p) {
+            return Ok(content);
+        }
+    }
+    Ok(r#"{"language":"en","auto_start":false,"minimize_tray":true,"notify_connect":true,"ping_interval":1}"#.into())
+}
+
+#[tauri::command]
+fn save_split_rules(mode: String, processes: Vec<String>, domains: Vec<String>) -> Result<String, String> {
+    let mut store = ProfileStore::load().map_err(|e| e.to_string())?;
+    let mut config = store.get_active_config().map_err(|e| e.to_string())?;
+    config.split_mode = mode;
+    config.split_processes = processes;
+    config.split_domains = domains;
+    store.update_active_config(config).map_err(|e| e.to_string())?;
+    Ok("Split rules saved".into())
+}
+
+// ── Split tunnel toggle ────────────────────────────────────────────
+
+#[tauri::command]
+fn get_split_state(state: State<AppState>) -> Result<bool, String> {
+    Ok(*state.split_enabled.lock().unwrap())
+}
+
+#[tauri::command]
+fn set_split_state(state: State<AppState>, enabled: bool) -> Result<bool, String> {
+    let mut s = state.split_enabled.lock().unwrap();
+    *s = enabled;
+    // Persist to config
+    if let Ok(mut store) = ProfileStore::load() {
+        if let Ok(mut config) = store.get_active_config() {
+            config.split_mode = if enabled { "exclude".into() } else { "off".into() };
+            store.update_active_config(config).ok();
+        }
+    }
+    Ok(enabled)
+}
+
+// ── Settings window (separate) ─────────────────────────────────────
+
+fn open_settings_window(app: &tauri::AppHandle) {
+    // Check if settings window already exists
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+
+    let builder = WebviewWindowBuilder::new(
+        app,
+        "settings",
+        WebviewUrl::App("settings.html".into()),
+    )
+    .title("dakal-tls Settings")
+    .inner_size(720.0, 500.0)
+    .resizable(true)
+    .center();
+
+    #[cfg(target_os = "windows")]
+    let builder = builder.decorations(true);
+
+    if let Err(e) = builder.build() {
+        eprintln!("[stls] Failed to create settings window: {e}");
+    }
+}
+
+#[tauri::command]
+fn show_settings(app: tauri::AppHandle) -> Result<String, String> {
+    open_settings_window(&app);
+    Ok("Opening settings".into())
+}
+
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("dakal-tls v5")
-        .inner_size(880.0, 600.0)
+        .title("dakal-tls v9")
+        .inner_size(430.0, 720.0)
         .resizable(true)
         .build()?;
     Ok(())
@@ -397,12 +461,20 @@ fn main() {
 
     let proxy_manager = ProxyManager::new().expect("Failed to init proxy manager");
 
+    // Load persisted split state
+    let initial_split = ProfileStore::load()
+        .ok()
+        .and_then(|s| s.get_active_config().ok())
+        .map(|c| c.split_mode == "exclude")
+        .unwrap_or(false);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             proxy: Mutex::new(proxy_manager),
             started_at: Mutex::new(None),
+            split_enabled: Mutex::new(initial_split),
         })
         .setup(|app| {
             let show_item = MenuItemBuilder::with_id("show", "Show").build(app)?;
@@ -499,7 +571,7 @@ fn main() {
                 })
                 .build(app)?;
 
-            // Initial tray state (profile name + correct menu)
+            // Initial tray state
             update_tray_state(&app.handle());
 
             create_main_window(&app.handle())?;
@@ -511,6 +583,7 @@ fn main() {
                     window.hide().ok();
                     api.prevent_close();
                 }
+                // Settings window can close normally
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -529,6 +602,12 @@ fn main() {
             get_total_traffic,
             get_uptime,
             get_log,
+            save_app_settings,
+            load_app_settings,
+            save_split_rules,
+            get_split_state,
+            set_split_state,
+            show_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");
