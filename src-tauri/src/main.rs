@@ -51,6 +51,9 @@ struct AppState {
     proxy: Mutex<ProxyManager>,
     started_at: Mutex<Option<Instant>>,
     split_enabled: Mutex<bool>,
+    // Store menu item handles for dynamic enable/disable
+    connect_item: Mutex<Option<tauri::menu::MenuItem>>,
+    disconnect_item: Mutex<Option<tauri::menu::MenuItem>>,
 }
 
 // ── Settings Window ─────────────────────────────────────────────────
@@ -90,11 +93,11 @@ fn update_tray_state(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
     let running = state.proxy.lock().unwrap().is_running();
     
-    // Get menu items by ID and enable/disable
-    if let Some(connect_item) = app.menu().and_then(|m| m.get("connect")) {
+    // Use stored handles for enable/disable
+    if let Some(connect_item) = state.connect_item.lock().unwrap().as_ref() {
         let _ = connect_item.set_enabled(!running);
     }
-    if let Some(disconnect_item) = app.menu().and_then(|m| m.get("disconnect")) {
+    if let Some(disconnect_item) = state.disconnect_item.lock().unwrap().as_ref() {
         let _ = disconnect_item.set_enabled(running);
     }
 }
@@ -156,6 +159,10 @@ fn main() {
                 .separator()
                 .item(&quit_item)
                 .build()?;
+
+            // Store menu item handles for dynamic enable/disable
+            *state.connect_item.lock().unwrap() = Some(connect_item.clone());
+            *state.disconnect_item.lock().unwrap() = Some(disconnect_item.clone());
 
             let _tray = TrayIconBuilder::with_id("main")
                 .tooltip("dakal-tls VPN")
