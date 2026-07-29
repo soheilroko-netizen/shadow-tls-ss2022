@@ -30,7 +30,6 @@
   .data-card {
     flex: 1;
     background: rgba(20, 20, 30, 0.6);
-    backdrop-filter: blur(6px);
     border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 12px;
     padding: 12px 14px;

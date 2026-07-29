@@ -12,6 +12,7 @@ export default defineConfig({
   build: {
     target: 'es2022',
     outDir: 'dist',
+    modulePreload: false,
     rollupOptions: {
       input: {
         main: 'index.html',
@@ -19,5 +20,15 @@ export default defineConfig({
       },
     },
   },
-  plugins: [svelte()],
+  plugins: [svelte(), removeCrossorigin()],
 })
+
+function removeCrossorigin() {
+  return {
+    name: 'remove-crossorigin',
+    enforce: 'post' as const,
+    transformIndexHtml(html: string) {
+      return html.replace(/ crossorigin/g, '')
+    },
+  }
+}

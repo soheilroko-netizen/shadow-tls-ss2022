@@ -60,7 +60,6 @@
     gap: 10px;
     padding: 10px 14px;
     background: rgba(20, 20, 30, 0.7);
-    backdrop-filter: blur(8px);
     border: 1px solid rgba(245, 158, 11, 0.12);
     border-radius: 10px;
     color: rgba(255,255,255,0.85);
@@ -111,7 +110,6 @@
     right: 0;
     z-index: 19;
     background: rgba(10, 10, 15, 0.97);
-    backdrop-filter: blur(12px);
     border: 1px solid rgba(245, 158, 11, 0.12);
     border-radius: 10px;
     overflow: hidden;

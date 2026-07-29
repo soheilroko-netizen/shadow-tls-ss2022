@@ -36,7 +36,6 @@
     padding: 8px 14px;
     flex-shrink: 0;
     background: rgba(10, 10, 15, 0.7);
-    backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(245, 158, 11, 0.1);
   }
   .app-title {

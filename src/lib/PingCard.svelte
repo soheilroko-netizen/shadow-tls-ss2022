@@ -47,21 +47,20 @@
   }
 
   onMount(() => {
-    canvas = document.getElementById('pc-canvas') as HTMLCanvasElement
+    // canvas is bound via bind:this
   })
 </script>
 
 <div class="ping-card">
   <div class="card-label">PING</div>
   <div class="ping-value">{pingMs !== null ? `${pingMs} ms` : '—'}</div>
-  <canvas id="pc-canvas" class="graph" width="140" height="36"></canvas>
+  <canvas bind:this={canvas} class="graph" width="140" height="36"></canvas>
 </div>
 
 <style>
   .ping-card {
     flex: 1;
     background: rgba(20, 20, 30, 0.6);
-    backdrop-filter: blur(6px);
     border: 1px solid rgba(245, 158, 11, 0.1);
     border-radius: 12px;
     padding: 12px 14px;
