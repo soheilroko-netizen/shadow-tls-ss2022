@@ -38,7 +38,7 @@ function show(el, text, type) {
 
 // ── View switching ───────────────────────────────────────────────
 
-const SIZES = { main: [500, 560], settings: [500, 600], log: [500, 480] };
+const SIZES = { main: [450, 672], settings: [500, 600], log: [500, 480] };
 const VIEWS  = { main: 'v-main', settings: 'v-settings', log: 'v-log' };
 
 async function showView(name) {
@@ -74,15 +74,11 @@ async function refreshMain() {
       $('#i-speed-down').textContent = fmtSpeed(s.speed_down);
       $('#i-total-up').textContent = fmtBytes(s.total_up);
       $('#i-total-down').textContent = fmtBytes(s.total_down);
-      $('#i-session-up').textContent = fmtBytes(s.up);
-      $('#i-session-down').textContent = fmtBytes(s.down);
     } else {
       $('#i-speed-up').textContent = '0 B/s';
       $('#i-speed-down').textContent = '0 B/s';
       $('#i-total-up').textContent = '0 B';
       $('#i-total-down').textContent = '0 B';
-      $('#i-session-up').textContent = '0 B';
-      $('#i-session-down').textContent = '0 B';
     }
 
     if (running && !wasRunning) startPing();
@@ -127,7 +123,6 @@ let pingInFlight = false;
 async function doPing() {
   if (pingInFlight) return;
   const el = $('#i-ping');
-  el.textContent = '...';
   pingInFlight = true;
   try { el.textContent = await invoke('ping'); }
   catch { el.textContent = 'TIMEOUT'; }
