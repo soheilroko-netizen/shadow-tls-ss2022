@@ -163,7 +163,7 @@ fn dns_interfaces() -> Vec<String> {
                 .next()
                 .unwrap_or("")
                 .trim()
-                .trim_end_matches(|c: c == ' ' || c == '\t' || c == '.');
+                .trim_end_matches(|c| c == ' ' || c == '\t' || c == '.');
             if !name.is_empty() {
                 v.push(name.to_string());
             }
@@ -595,10 +595,11 @@ fn get_config(state: State<AppState>) -> Result<Config, String> {
 #[tauri::command]
 fn save_config(config: Config, state: State<AppState>) -> Result<String, String> {
     let mut store = state.store.lock().unwrap();
+    let active = store.active_profile.clone();
     let p = store
         .profiles
         .iter_mut()
-        .find(|p| p.name == store.active_profile)
+        .find(|p| p.name == active)
         .ok_or("active profile not found")?;
     p.config = config;
     store.save().map_err(|e| e.to_string())?;
