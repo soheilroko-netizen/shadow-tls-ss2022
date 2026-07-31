@@ -350,7 +350,7 @@ fn build_singbox_config(c: &Config) -> Result<serde_json::Value> {
                 "type": "shadowtls", "tag": "shadowtls-out",
                 "server": ip, "server_port": c.stls_port, "version": 3,
                 "password": c.stls_password,
-                "tls": {"enabled": true, "server_name": c.stls_sni}
+                "tls": {"enabled": true, "server_name": c.stls_sni, "insecure": false}
             },
             {"type": "direct", "tag": "direct"}
         ],
