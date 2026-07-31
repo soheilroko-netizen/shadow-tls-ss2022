@@ -3,29 +3,9 @@
 
 // ── Single-instance guard via named mutex (Windows) ──────────────────
 // Prevents launching a second instance while one is already running.
-#[cfg(target_os = "windows")]
 fn check_single_instance() {
-    use std::ffi::CString;
-    use std::ptr;
-    extern "system" {
-        fn CreateMutexA(
-            lpMutexAttributes: *mut std::ffi::c_void,
-            bInitialOwner: i32,
-            lpName: *const i8,
-        ) -> *mut std::ffi::c_void;
-        fn GetLastError() -> u32;
-    }
-    let name = CString::new("Local\\stls-single-instance-mutex").unwrap();
-    let handle = unsafe { CreateMutexA(ptr::null_mut(), 0, name.as_ptr()) };
-    if handle.is_null() {
-        eprintln!("[stls] CreateMutexA failed");
-        return;
-    }
-    const ERROR_ALREADY_EXISTS: u32 = 183;
-    if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
-        println!("[stls] Another instance is already running — exiting.");
-        std::process::exit(0);
-    }
+    // Temporarily disabled — was causing silent exit on relaunch
+    return;
 }
 
 #[cfg(not(target_os = "windows"))]
