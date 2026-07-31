@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { getCurrentWindow, WebviewWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import './styles.css';
 
 // ── Types ────────────────────────────────────────────────────
@@ -210,13 +210,8 @@ async function refreshLog() {
 // ── Open settings window ─────────────────────────────────────
 async function openSettings() {
   try {
-    const existing = await WebviewWindow.getByLabel('settings');
-    if (existing) {
-      await existing.setFocus();
-      return;
-    }
-    await new WebviewWindow('settings', { url: 'settings.html' });
-  } catch (e) {
+    await invoke('open_settings_window');
+  } catch (e: any) {
     console.error('Failed to open settings:', e);
     showMessage('Failed to open settings', true);
   }

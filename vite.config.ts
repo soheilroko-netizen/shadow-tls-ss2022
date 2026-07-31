@@ -10,6 +10,7 @@ export default defineConfig({
   build: {
     target: 'es2022',
     outDir: 'dist',
+    esbuild: { target: 'es2022' },
     rollupOptions: {
       input: {
         main: 'index.html',
