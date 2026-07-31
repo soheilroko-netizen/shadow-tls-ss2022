@@ -1,8 +1,8 @@
 [package]
 name = "dakal-tls"
-version = "5.0.0"
+version = "6.0.0"
 edition = "2021"
-description = "dakal-tls - ShadowTLS + Shadowsocks VPN with GUI"
+description = "dakal-tls — ShadowTLS + Shadowsocks VPN"
 license = "MIT"
 
 [[bin]]
@@ -19,10 +19,6 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 zip = "2"
 directories = "5"
 anyhow = "1"
-
-# Tauri v2
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
-
-[target.'cfg(windows)'.dependencies]

@@ -1,0 +1,271 @@
+/* ── dakal-tls v6 — dark theme ───────────────────────────────── */
+
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --surface2: #1c2128;
+  --border:   #30363d;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+  --accent:   #58a6ff;
+  --green:    #3fb950;
+  --red:      #f85149;
+  --radius:   10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#app { width: 100%; height: 100%; }
+
+/* ── Views ────────────────────────────────────────────────────── */
+
+.view {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 22px;
+  gap: 12px;
+}
+.view.active { display: flex; }
+
+/* ── Header ───────────────────────────────────────────────────── */
+
+.hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hdr h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ── Bar (profile selector + buttons) ─────────────────────────── */
+
+.bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.bar select {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+}
+.bar select:focus { border-color: var(--accent); }
+
+/* ── Icon / pill / back buttons ───────────────────────────────── */
+
+.icon {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 16px;
+  transition: .15s;
+}
+.icon:hover { background: var(--surface2); color: var(--text); }
+
+.pill {
+  padding: 5px 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: .15s;
+}
+.pill:hover { background: var(--surface2); }
+.pill.warn { color: var(--red); }
+
+.back {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 18px;
+  transition: .15s;
+}
+.back:hover { color: var(--text); background: var(--surface2); }
+
+/* ── Card ─────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--red);
+  transition: .3s;
+}
+.dot.on {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+}
+
+.info-card { padding: 2px 0; }
+.info-card .row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.info-card .row.last { border-bottom: none; }
+.lbl { color: var(--muted); font-size: 13px; }
+.val { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.mono { font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; }
+
+/* ── Ping button inside value ─────────────────────────────────── */
+
+.pill-sm {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* ── Main actions ─────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s;
+}
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--green); color: #fff; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.15); }
+.btn.danger  { background: var(--red); color: #fff; }
+.btn.danger:hover:not(:disabled)  { filter: brightness(1.15); }
+
+/* ── Message ──────────────────────────────────────────────────── */
+
+.msg {
+  text-align: center;
+  font-size: 12px;
+  min-height: 18px;
+  transition: .2s;
+}
+.msg.ok  { color: var(--green); }
+.msg.err { color: var(--red); }
+
+/* ── Settings ─────────────────────────────────────────────────── */
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.scroll::-webkit-scrollbar { width: 6px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.dim { font-weight: 400; color: var(--border); }
+.field input, .field textarea {
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: .15s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  resize: vertical;
+  min-height: 56px;
+}
+
+/* ── Log ──────────────────────────────────────────────────────── */
+
+.logbox {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  color: #7ee787;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.logbox::-webkit-scrollbar { width: 6px; }
+.logbox::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Ping button inside row ───────────────────────────────────── */
+
+#btn-ping {
+  padding: 2px 10px;
+  font-size: 11px;
+}

@@ -8,7 +8,7 @@ fn main() {
   <assemblyIdentity
     type="win32"
     name="dakal-tls"
-    version="5.0.0.0"
+    version="6.0.0.0"
   />
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
