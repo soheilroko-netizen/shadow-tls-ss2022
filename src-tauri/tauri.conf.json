@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "dakal-tls",
+  "productName": "amameborne",
   "version": "6.0.0",
-  "identifier": "com.dakal-tls.app",
+  "identifier": "com.amameborne.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

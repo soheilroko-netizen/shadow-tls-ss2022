@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! dakal-tls v6 — single-file Tauri backend
+//! amameborne v6 — single-file Tauri backend
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ fn check_single_instance() {
         fn CreateMutexA(_: *mut core::ffi::c_void, _: i32, _: *const i8) -> *mut core::ffi::c_void;
         fn GetLastError() -> u32;
     }
-    let name = CString::new("Local\\dakal-tls-mutex").unwrap();
+    let name = CString::new("Local\\amameborne-mutex").unwrap();
     let h = unsafe { CreateMutexA(ptr::null_mut(), 0, name.as_ptr()) };
     if !h.is_null() && unsafe { GetLastError() } == 183 {
         std::process::exit(0);
@@ -48,7 +48,7 @@ fn no_window(cmd: &mut Command) -> &mut Command {
 // ── Config ───────────────────────────────────────────────────────────
 
 fn app_config_dir() -> Result<PathBuf> {
-    let d = directories::ProjectDirs::from("com", "dakal-tls", "dakal-tls")
+    let d = directories::ProjectDirs::from("com", "amameborne", "amameborne")
         .ok_or_else(|| anyhow::anyhow!("no config dir"))?
         .config_dir()
         .to_path_buf();
@@ -495,7 +495,7 @@ impl ProxyManager {
             return Ok(exe);
         }
         let client = reqwest::blocking::Client::builder()
-            .user_agent("dakal-tls")
+            .user_agent("amameborne")
             .build()?;
         let rel: serde_json::Value = client
             .get("https://api.github.com/repos/SagerNet/sing-box/releases/latest")
@@ -703,9 +703,9 @@ fn update_tray(app: &tauri::AppHandle) {
     let profile = state.store.lock().unwrap().active_profile.clone();
 
     let tooltip = if running {
-        format!("dakal-tls — {profile}")
+        format!("amameborne — {profile}")
     } else {
-        "dakal-tls".into()
+        "amameborne".into()
     };
 
     let mk = |id: &str, label: &str| MenuItemBuilder::with_id(id, label).build(app).unwrap();
@@ -758,7 +758,7 @@ fn main() {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .unwrap_or_default()
-        .join("dakal-tls-panic.log");
+        .join("amameborne-panic.log");
     std::fs::write(&panic_log, "starting\n").ok();
     let pl = panic_log;
     std::panic::set_hook(Box::new(move |info| {
@@ -814,7 +814,7 @@ fn main() {
                 .build()?;
 
             let _tray = TrayIconBuilder::with_id("main")
-                .tooltip("dakal-tls")
+                .tooltip("amameborne")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id().as_ref() {
@@ -886,7 +886,7 @@ fn main() {
             update_tray(&app.handle());
 
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("dakal-tls")
+                .title("amameborne")
                 .inner_size(500.0, 480.0)
                 .resizable(false)
                 .build()?;

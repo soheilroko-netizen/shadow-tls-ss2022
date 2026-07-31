@@ -7,7 +7,7 @@ fn main() {
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <assemblyIdentity
     type="win32"
-    name="dakal-tls"
+    name="amameborne"
     version="6.0.0.0"
   />
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">

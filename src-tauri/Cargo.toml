@@ -1,12 +1,12 @@
 [package]
-name = "dakal-tls"
+name = "amameborne"
 version = "6.0.0"
 edition = "2021"
-description = "dakal-tls — ShadowTLS + Shadowsocks VPN"
+description = "amameborne — ShadowTLS + Shadowsocks VPN"
 license = "MIT"
 
 [[bin]]
-name = "dakal-tls"
+name = "amameborne"
 path = "src/main.rs"
 
 [build-dependencies]
