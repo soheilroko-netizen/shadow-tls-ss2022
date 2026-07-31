@@ -211,8 +211,13 @@ fn restore_dns_all() {}
 struct TrafficCache {
     up: u64,
     down: u64,
+    total_up: u64,
+    total_down: u64,
     speed_up: u64,
     speed_down: u64,
+    baseline_up: u64,
+    baseline_down: u64,
+    reset: bool,
 }
 
 fn fetch_connections(client: &reqwest::blocking::Client) -> Result<(u64, u64)> {
@@ -223,8 +228,8 @@ fn fetch_connections(client: &reqwest::blocking::Client) -> Result<(u64, u64)> {
         .context("Clash API connect")?;
     let v: serde_json::Value = r.json().context("Clash API parse")?;
     Ok((
-        v["upload_total"].as_u64().unwrap_or(0),
-        v["download_total"].as_u64().unwrap_or(0),
+        v["uploadTotal"].as_u64().unwrap_or(0),
+        v["downloadTotal"].as_u64().unwrap_or(0),
     ))
 }
 
@@ -245,6 +250,23 @@ fn traffic_poller(cache: Arc<Mutex<TrafficCache>>, active: Arc<AtomicBool>) {
         match fetch_connections(&client) {
             Ok((up, down)) => {
                 let now = Instant::now();
+                let mut c = cache.lock().unwrap();
+                if c.reset {
+                    c.baseline_up = up;
+                    c.baseline_down = down;
+                    c.reset = false;
+                    c.up = 0;
+                    c.down = 0;
+                    c.speed_up = 0;
+                    c.speed_down = 0;
+                    prev_up = up;
+                    prev_down = down;
+                    prev_time = now;
+                    was_up = true;
+                    drop(c);
+                    std::thread::sleep(Duration::from_secs(2));
+                    continue;
+                }
                 let dt = now.duration_since(prev_time).as_secs_f64();
                 let (su, sd) = if was_up && dt > 0.5 {
                     (
@@ -258,15 +280,20 @@ fn traffic_poller(cache: Arc<Mutex<TrafficCache>>, active: Arc<AtomicBool>) {
                 prev_down = down;
                 prev_time = now;
                 was_up = true;
-                let mut c = cache.lock().unwrap();
-                *c = TrafficCache { up, down, speed_up: su, speed_down: sd };
+                c.total_up = up;
+                c.total_down = down;
+                c.up = up.saturating_sub(c.baseline_up);
+                c.down = down.saturating_sub(c.baseline_down);
+                c.speed_up = su;
+                c.speed_down = sd;
             }
             Err(_) => {
                 was_up = false;
                 prev_up = 0;
                 prev_down = 0;
                 let mut c = cache.lock().unwrap();
-                *c = TrafficCache::default();
+                c.speed_up = 0;
+                c.speed_down = 0;
             }
         }
         std::thread::sleep(Duration::from_secs(2));
@@ -538,6 +565,8 @@ struct Stats {
     running: bool,
     up: u64,
     down: u64,
+    total_up: u64,
+    total_down: u64,
     speed_up: u64,
     speed_down: u64,
     uptime: u64,
@@ -563,7 +592,7 @@ fn get_stats(state: State<AppState>) -> Result<Stats, String> {
         .active_config()
         .map(|c| format!("{}:{}", c.server_address, c.stls_port))
         .unwrap_or_default();
-    Ok(Stats { running, up: t.up, down: t.down, speed_up: t.speed_up, speed_down: t.speed_down, uptime, profile, server })
+    Ok(Stats { running, up: t.up, down: t.down, total_up: t.total_up, total_down: t.total_down, speed_up: t.speed_up, speed_down: t.speed_down, uptime, profile, server })
 }
 
 #[tauri::command]
@@ -572,6 +601,7 @@ fn connect(app: tauri::AppHandle, state: State<AppState>) -> Result<String, Stri
     let cfg = state.store.lock().unwrap().active_config().map_err(|e| e.to_string())?;
     let r = proxy.start(&cfg).map_err(|e| e.to_string())?;
     *state.started_at.lock().unwrap() = Some(Instant::now());
+    state.traffic.lock().unwrap().reset = true;
     drop(proxy);
     update_tray(&app);
     Ok(r)
@@ -837,6 +867,7 @@ fn main() {
                             if let Ok(cfg) = cfg {
                                 let _ = px.start(&cfg);
                                 *s.started_at.lock().unwrap() = Some(Instant::now());
+                                s.traffic.lock().unwrap().reset = true;
                             }
                         }
                         drop(px);

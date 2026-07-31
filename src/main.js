@@ -13,6 +13,13 @@ function fmtBytes(b) {
   return `${(b / 1073741824).toFixed(2)} GB`;
 }
 
+function fmtSpeed(b) {
+  if (b === 0) return '0 B/s';
+  if (b < 1024) return `${b} B/s`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB/s`;
+  return `${(b / 1048576).toFixed(1)} MB/s`;
+}
+
 function fmtUptime(s) {
   if (!s) return '-';
   const h = Math.floor(s / 3600);
@@ -31,7 +38,7 @@ function show(el, text, type) {
 
 // ── View switching ───────────────────────────────────────────────
 
-const SIZES = { main: [500, 480], settings: [500, 600], log: [500, 480] };
+const SIZES = { main: [500, 560], settings: [500, 600], log: [500, 480] };
 const VIEWS  = { main: 'v-main', settings: 'v-settings', log: 'v-log' };
 
 async function showView(name) {
@@ -47,30 +54,41 @@ async function showView(name) {
 // ── Main view ────────────────────────────────────────────────────
 
 let profilesLoaded = false;
+let wasRunning = false;
 
 async function refreshMain() {
   try {
     const s = await invoke('get_stats');
 
-    // Status
-    $('#dot').classList.toggle('on', s.running);
-    $('#status-text').textContent = s.running ? 'Connected' : 'Disconnected';
-    $('#btn-connect').disabled = s.running;
-    $('#btn-disconnect').disabled = !s.running;
+    const running = s.running;
+    $('#dot').classList.toggle('on', running);
+    $('#status-text').textContent = running ? 'Connected' : 'Disconnected';
+    $('#btn-connect').disabled = running;
+    $('#btn-disconnect').disabled = !running;
 
-    // Info
     $('#i-server').textContent = s.server || '-';
     $('#i-uptime').textContent = fmtUptime(s.uptime);
 
-    if (s.running) {
-      $('#i-upload').textContent = s.speed_up ? `${fmtBytes(s.speed_up)}/s  (${fmtBytes(s.up)})` : fmtBytes(s.up);
-      $('#i-download').textContent = s.speed_down ? `${fmtBytes(s.speed_down)}/s  (${fmtBytes(s.down)})` : fmtBytes(s.down);
+    if (running) {
+      $('#i-speed-up').textContent = fmtSpeed(s.speed_up);
+      $('#i-speed-down').textContent = fmtSpeed(s.speed_down);
+      $('#i-total-up').textContent = fmtBytes(s.total_up);
+      $('#i-total-down').textContent = fmtBytes(s.total_down);
+      $('#i-session-up').textContent = fmtBytes(s.up);
+      $('#i-session-down').textContent = fmtBytes(s.down);
     } else {
-      $('#i-upload').textContent = '0 B';
-      $('#i-download').textContent = '0 B';
+      $('#i-speed-up').textContent = '0 B/s';
+      $('#i-speed-down').textContent = '0 B/s';
+      $('#i-total-up').textContent = '0 B';
+      $('#i-total-down').textContent = '0 B';
+      $('#i-session-up').textContent = '0 B';
+      $('#i-session-down').textContent = '0 B';
     }
 
-    // Profile dropdown (once)
+    if (running && !wasRunning) startPing();
+    if (!running && wasRunning) stopPing();
+    wasRunning = running;
+
     if (!profilesLoaded) {
       const ps = await invoke('get_profiles');
       const sel = $('#main-profile');
@@ -92,25 +110,39 @@ async function refreshMain() {
 // ── Connect / Disconnect ─────────────────────────────────────────
 
 async function doConnect() {
-  try {
-    show($('#msg'), await invoke('connect'), 'ok');
-    setTimeout(doPing, 1500);
-  } catch (e) { show($('#msg'), '' + e, 'err'); }
+  try { show($('#msg'), await invoke('connect'), 'ok'); }
+  catch (e) { show($('#msg'), '' + e, 'err'); }
 }
 
 async function doDisconnect() {
-  try {
-    show($('#msg'), await invoke('disconnect'), 'ok');
-  } catch (e) { show($('#msg'), '' + e, 'err'); }
+  try { show($('#msg'), await invoke('disconnect'), 'ok'); }
+  catch (e) { show($('#msg'), '' + e, 'err'); }
 }
 
-// ── Ping ─────────────────────────────────────────────────────────
+// ── Real-time Ping (2s) ──────────────────────────────────────────
+
+let pingTimer = null;
+let pingInFlight = false;
 
 async function doPing() {
+  if (pingInFlight) return;
   const el = $('#i-ping');
   el.textContent = '...';
+  pingInFlight = true;
   try { el.textContent = await invoke('ping'); }
   catch { el.textContent = 'TIMEOUT'; }
+  pingInFlight = false;
+}
+
+function startPing() {
+  if (pingTimer) return;
+  doPing();
+  pingTimer = setInterval(doPing, 2000);
+}
+
+function stopPing() {
+  if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+  $('#i-ping').textContent = '-';
 }
 
 // ── Settings ─────────────────────────────────────────────────────
@@ -128,9 +160,7 @@ async function loadSettings() {
       sel.appendChild(o);
     });
     await fillForm();
-  } catch (e) {
-    show($('#settings-msg'), '' + e, 'err');
-  }
+  } catch (e) { show($('#settings-msg'), '' + e, 'err'); }
 }
 
 async function fillForm() {
@@ -145,9 +175,7 @@ async function fillForm() {
     $('#f-socks5').value = c.socks5_port;
     $('#f-mtu').value = c.mtu ?? '';
     $('#f-split').value = c.split_rules.map(r => r.pattern).join('\n');
-  } catch (e) {
-    show($('#settings-msg'), '' + e, 'err');
-  }
+  } catch (e) { show($('#settings-msg'), '' + e, 'err'); }
 }
 
 function readForm() {
@@ -215,37 +243,32 @@ async function refreshLog() {
   catch (e) { $('#log-content').textContent = '' + e; }
 }
 
-// ── Polling ──────────────────────────────────────────────────────
+// ── Polling (1s) ─────────────────────────────────────────────────
 
 let pollTimer = null;
 
 function startPoll() {
   if (pollTimer) return;
-  pollTimer = setInterval(refreshMain, 2000);
+  pollTimer = setInterval(refreshMain, 1000);
 }
 
 // ── Init ─────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Navigation
   $('#btn-settings').onclick = () => showView('settings');
   $('#btn-log').onclick = () => showView('log');
   $('#back-settings').onclick = () => showView('main');
   $('#back-log').onclick = () => showView('main');
 
-  // Actions
   $('#btn-connect').onclick = doConnect;
   $('#btn-disconnect').onclick = doDisconnect;
-  $('#btn-ping').onclick = doPing;
 
-  // Settings
   $('#settings-form').onsubmit = doSave;
   $('#settings-profile').onchange = doSwitchProfile;
   $('#btn-new').onclick = doNewProfile;
   $('#btn-del').onclick = doDeleteProfile;
   $('#btn-refresh').onclick = refreshLog;
 
-  // Main profile switch
   $('#main-profile').onchange = async () => {
     const name = $('#main-profile').value;
     if (!name) return;
