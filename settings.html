@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings - dakal-tls</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="settings-window">
+    <div id="app">
+      <div class="settings-header">
+        <h1>Settings</h1>
+        <p class="subtitle">Configure your VPN profiles and preferences</p>
+      </div>
+
+      <!-- Tab navigation -->
+      <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="app">App</button>
+        <button class="tab-btn" role="tab" data-tab="profile">Profile</button>
+        <button class="tab-btn" role="tab" data-tab="split">Split Tunnel</button>
+      </div>
+
+      <!-- App Settings Tab -->
+      <div class="tab-panel active" id="tab-app" role="tabpanel">
+        <div class="form-group">
+          <label>Theme</label>
+          <select id="cfg-theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">System</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Language</label>
+          <select id="cfg-language">
+            <option value="en">English</option>
+            <option value="fa">فارسی</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-label">
+          <input type="checkbox" id="cfg-start-minimized" />
+          <span>Start minimized to tray</span>
+        </div>
+        <div class="form-group checkbox-label">
+          <input type="checkbox" id="cfg-auto-connect" />
+          <span>Auto-connect on startup</span>
+        </div>
+        <div class="form-group checkbox-label">
+          <input type="checkbox" id="cfg-close-to-tray" />
+          <span>Close to tray (don't quit)</span>
+        </div>
+      </div>
+
+      <!-- Profile Settings Tab -->
+      <div class="tab-panel" id="tab-profile" role="tabpanel">
+        <div class="profile-bar">
+          <label for="cfg-profile-select">Active Profile:</label>
+          <select id="cfg-profile-select"></select>
+          <button id="cfg-new-profile" class="btn-small">New</button>
+          <button id="cfg-delete-profile" class="btn-small">Delete</button>
+        </div>
+
+        <div class="form-group">
+          <label>Server Address (IP or domain)</label>
+          <input type="text" id="cfg-server-address" placeholder="ns.baft.uk" />
+        </div>
+        <div class="form-group">
+          <label>ShadowTLS Port</label>
+          <input type="number" id="cfg-stls-port" placeholder="8553" />
+        </div>
+        <div class="form-group">
+          <label>ShadowTLS Password</label>
+          <input type="text" id="cfg-stls-password" placeholder="password" />
+        </div>
+        <div class="form-group">
+          <label>ShadowTLS SNI</label>
+          <input type="text" id="cfg-stls-sni" placeholder="dl.google.com" />
+        </div>
+        <div class="form-group">
+          <label>Shadowsocks Port</label>
+          <input type="number" id="cfg-ss-port" placeholder="8380" />
+        </div>
+        <div class="form-group">
+          <label>Shadowsocks Password</label>
+          <input type="text" id="cfg-ss-password" placeholder="password" />
+        </div>
+        <div class="form-group">
+          <label>Socks5 Port</label>
+          <input type="number" id="cfg-socks5-port" placeholder="1080" />
+        </div>
+
+        <div class="settings-controls">
+          <button id="btn-save-config" class="btn btn-primary">Save Profile</button>
+        </div>
+        <div id="settings-message" class="message"></div>
+      </div>
+
+      <!-- Split Tunnel Tab -->
+      <div class="tab-panel" id="tab-split" role="tabpanel">
+        <div class="form-group">
+          <label>Domain Rules (one per line)</label>
+          <textarea id="cfg-split-domains" rows="8" placeholder="google.com&#10;github.com&#10;*.cloudflare.com"></textarea>
+          <small class="hint">Rules apply when Split Tunneling is enabled. Use wildcards (*) for subdomains.</small>
+        </div>
+        <div class="form-group checkbox-label">
+          <input type="checkbox" id="cfg-split-enabled" />
+          <span>Enable Split Tunneling (route only listed domains through VPN)</span>
+        </div>
+        <div class="settings-controls">
+          <button id="btn-save-split" class="btn btn-primary">Save Rules</button>
+        </div>
+        <div id="split-message" class="message"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/settings.ts"></script>
+  </body>
+</html>

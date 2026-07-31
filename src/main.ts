@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow, WebviewWindow } from '@tauri-apps/api/window';
 import './styles.css';
 
 // ── Types ────────────────────────────────────────────────────
@@ -16,24 +17,6 @@ interface FullStatus {
   log_lines: string[];
 }
 
-interface Profile {
-  name: string;
-  is_active: boolean;
-  config?: { server_address?: string };
-}
-
-interface Config {
-  server_address: string;
-  ss_port: number;
-  ss_password: string;
-  stls_port: number;
-  stls_password: string;
-  stls_sni: string;
-  socks5_port: number;
-  mtu?: number;
-  split_rules?: { pattern: string }[];
-}
-
 // ── Elements ─────────────────────────────────────────────────
 const statusDot = document.getElementById('status-dot')!;
 const statusText = document.getElementById('status-text')!;
@@ -48,15 +31,11 @@ const btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
 const btnSettings = document.getElementById('btn-main-settings')!;
 const btnLog = document.getElementById('btn-main-log')!;
 const mainProfileSelect = document.getElementById('main-profile-select') as HTMLSelectElement;
-
-// Views
-const mainView = document.getElementById('main-view')!;
-const settingsView = document.getElementById('settings-view')!;
-const logView = document.getElementById('log-view')!;
 const logContent = document.getElementById('log-content')!;
 const btnRefreshLog = document.getElementById('btn-refresh-log')!;
 const btnBackFromLog = document.getElementById('btn-back-from-log')!;
-const btnBackFromSettings = document.getElementById('btn-back-from-settings')!;
+const mainView = document.getElementById('main-view')!;
+const logView = document.getElementById('log-view')!;
 
 // ── Helpers ──────────────────────────────────────────────────
 function formatBytes(bytes: number): string {
@@ -90,30 +69,59 @@ function clearMessage() {
   message.className = 'message';
 }
 
-// ── Views ────────────────────────────────────────────────────
-function showView(view: 'main' | 'settings' | 'log') {
+function showView(view: 'main' | 'log') {
   mainView.style.display = view === 'main' ? 'block' : 'none';
-  settingsView.style.display = view === 'settings' ? 'block' : 'none';
   logView.style.display = view === 'log' ? 'block' : 'none';
-  if (view === 'settings') loadSettingsForm();
   if (view === 'log') refreshLog();
 }
 
-// ── Profiles ─────────────────────────────────────────────────
-async function loadProfiles() {
-  try {
-    const store = await invoke<{ profiles: Profile[]; active_profile: string }>('get_profiles');
-    mainProfileSelect.innerHTML = '';
-    store.profiles.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.name;
-      opt.textContent = p.name;
-      if (p.name === store.active_profile) opt.selected = true;
-      mainProfileSelect.appendChild(opt);
-    });
-  } catch (e) {
-    console.error('Failed to load profiles:', e);
+// ── Uptime local tracking (fixes jump race) ──────────────────
+let localUptime = 0;
+let uptimeTimer: ReturnType<typeof setInterval> | null = null;
+let lastServerUptime = 0;
+
+function startUptimeTimer(baseSecs: number) {
+  stopUptimeTimer();
+  localUptime = baseSecs;
+  uptimeValue.textContent = formatUptime(localUptime);
+  uptimeTimer = setInterval(() => {
+    localUptime++;
+    uptimeValue.textContent = formatUptime(localUptime);
+  }, 1000);
+}
+
+function stopUptimeTimer() {
+  if (uptimeTimer) clearInterval(uptimeTimer);
+  uptimeTimer = null;
+}
+
+function syncUptime(serverSecs: number) {
+  // Only correct if drift > 2s (prevents visual jumps from latency)
+  if (Math.abs(serverSecs - localUptime) > 2) {
+    localUptime = serverSecs;
+    uptimeValue.textContent = formatUptime(localUptime);
   }
+  lastServerUptime = serverSecs;
+}
+
+// ── Traffic local tracking (smoother display) ────────────────
+let lastTraffic = { up: 0, down: 0, totalUp: 0, totalDown: 0, time: Date.now() };
+
+function calcSpeeds(curUp: number, curDown: number, curTotalUp: number, curTotalDown: number) {
+  const now = Date.now();
+  const elapsed = (now - lastTraffic.time) / 1000;
+  if (elapsed < 0.5) {
+    // Too soon, keep previous display
+    return { upSpeed: 0, downSpeed: 0, showTotal: false };
+  }
+  const upDelta = curUp - lastTraffic.up;
+  const downDelta = curDown - lastTraffic.down;
+  lastTraffic = { up: curUp, down: curDown, totalUp: curTotalUp, totalDown: curTotalDown, time: now };
+  return {
+    upSpeed: upDelta / elapsed,
+    downSpeed: downDelta / elapsed,
+    showTotal: true,
+  };
 }
 
 // ── Auto-ping ────────────────────────────────────────────────
@@ -146,25 +154,37 @@ async function updateStatus() {
   try {
     const s = await invoke<FullStatus>('get_full_status');
 
+    // Connection state
     statusText.textContent = s.running ? 'Connected' : 'Disconnected';
     statusDot.classList.toggle('connected', s.running);
     statusAddress.textContent = s.running && s.server ? s.server : '';
 
-    if (!s.running) pingValue.textContent = '-';
+    // Uptime - sync with local timer
+    if (s.running) {
+      syncUptime(s.uptime_secs);
+      if (!uptimeTimer) startUptimeTimer(s.uptime_secs);
+    } else {
+      stopUptimeTimer();
+      uptimeValue.textContent = '-';
+    }
 
-    uptimeValue.textContent = formatUptime(s.uptime_secs);
+    // Traffic speeds
+    if (s.running) {
+      const { upSpeed, downSpeed, showTotal } = calcSpeeds(s.traffic_up, s.traffic_down, s.total_up, s.total_down);
+      if (showTotal) {
+        trafficValue.textContent = `↑ ${formatSpeed(upSpeed)}  ↓ ${formatSpeed(downSpeed)}`;
+        totalTrafficValue.textContent = `↑ ${formatBytes(s.total_up)}  ↓ ${formatBytes(s.total_down)}`;
+      }
+    } else {
+      trafficValue.textContent = '↑ 0 B/s  ↓ 0 B/s';
+      totalTrafficValue.textContent = '↑ 0 B  ↓ 0 B';
+    }
 
-    trafficValue.textContent = s.running
-      ? `↑ ${formatSpeed(s.traffic_up)}  ↓ ${formatSpeed(s.traffic_down)}`
-      : '↑ 0 B/s  ↓ 0 B/s';
-
-    totalTrafficValue.textContent = s.running
-      ? `↑ ${formatBytes(s.total_up)}  ↓ ${formatBytes(s.total_down)}`
-      : '↑ 0 B  ↓ 0 B';
-
+    // Buttons
     btnStart.disabled = s.running;
     btnStop.disabled = !s.running;
 
+    // Ping loop
     if (s.running && s.pid !== lastPid) {
       startPingLoop();
     } else if (!s.running) {
@@ -187,81 +207,18 @@ async function refreshLog() {
   }
 }
 
-// ── Settings form ────────────────────────────────────────────
-let profilesData: Profile[] = [];
-let activeProfile = 'Default';
-
-async function loadSettingsForm() {
+// ── Open settings window ─────────────────────────────────────
+async function openSettings() {
   try {
-    const store = await invoke<{ profiles: Profile[]; active_profile: string }>('get_profiles');
-    profilesData = store.profiles;
-    activeProfile = store.active_profile;
-
-    const select = document.getElementById('cfg-profile-select') as HTMLSelectElement;
-    select.innerHTML = '';
-    store.profiles.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.name;
-      opt.textContent = p.name;
-      if (p.name === store.active_profile) opt.selected = true;
-      select.appendChild(opt);
-    });
-
-    await loadProfileFields(store.active_profile);
+    const existing = await WebviewWindow.getByLabel('settings');
+    if (existing) {
+      await existing.setFocus();
+      return;
+    }
+    await new WebviewWindow('settings', { url: 'settings.html' });
   } catch (e) {
-    showSettingsMessage(`Failed: ${e}`, true);
-  }
-}
-
-async function loadProfileFields(name: string) {
-  try {
-    const config = await invoke<Config>('get_config');
-    // If switching profiles, get that profile's config
-    const profile = profilesData.find(p => p.name === name);
-    // Use get_config which returns active profile config
-    (document.getElementById('cfg-server-address') as HTMLInputElement).value = config.server_address;
-    (document.getElementById('cfg-stls-port') as HTMLInputElement).value = String(config.stls_port);
-    (document.getElementById('cfg-stls-password') as HTMLInputElement).value = config.stls_password;
-    (document.getElementById('cfg-stls-sni') as HTMLInputElement).value = config.stls_sni;
-    (document.getElementById('cfg-ss-port') as HTMLInputElement).value = String(config.ss_port);
-    (document.getElementById('cfg-ss-password') as HTMLInputElement).value = config.ss_password;
-    (document.getElementById('cfg-socks5-port') as HTMLInputElement).value = String(config.socks5_port);
-    const rules = (config.split_rules || []).map(r => r.pattern).join('\n');
-    (document.getElementById('cfg-split-domains') as HTMLTextAreaElement).value = rules;
-  } catch (e) {
-    showSettingsMessage(`Failed to load config: ${e}`, true);
-  }
-}
-
-function showSettingsMsg(msg: string, isError = false) {
-  const el = document.getElementById('settings-message')!;
-  el.textContent = msg;
-  el.className = `message ${isError ? 'error' : 'success'}`;
-}
-
-function showSettingsMessage(msg: string, isError = false) {
-  showSettingsMsg(msg, isError);
-}
-
-async function saveProfileConfig() {
-  try {
-    const config: Config = {
-      server_address: (document.getElementById('cfg-server-address') as HTMLInputElement).value,
-      stls_port: parseInt((document.getElementById('cfg-stls-port') as HTMLInputElement).value) || 8553,
-      stls_password: (document.getElementById('cfg-stls-password') as HTMLInputElement).value,
-      stls_sni: (document.getElementById('cfg-stls-sni') as HTMLInputElement).value,
-      ss_port: parseInt((document.getElementById('cfg-ss-port') as HTMLInputElement).value) || 8380,
-      ss_password: (document.getElementById('cfg-ss-password') as HTMLInputElement).value,
-      socks5_port: parseInt((document.getElementById('cfg-socks5-port') as HTMLInputElement).value) || 1080,
-      split_rules: (document.getElementById('cfg-split-domains') as HTMLTextAreaElement).value
-        .split('\n')
-        .filter(l => l.trim())
-        .map(l => ({ pattern: l.trim() })),
-    };
-    await invoke('save_config', { config });
-    showSettingsMsg('Saved');
-  } catch (e) {
-    showSettingsMsg(`Failed: ${e}`, true);
+    console.error('Failed to open settings:', e);
+    showMessage('Failed to open settings', true);
   }
 }
 
@@ -273,6 +230,11 @@ listen('proxy-log', (event: { payload: string }) => {
   }
 });
 
+listen('profile-switched', async (event: { payload: string }) => {
+  mainProfileSelect.value = event.payload;
+  clearMessage();
+});
+
 // ── Button handlers ──────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   clearMessage();
@@ -280,7 +242,6 @@ btnStart.addEventListener('click', async () => {
   try {
     await invoke('start_proxy', { profile: mainProfileSelect.value });
     showMessage('Started');
-    startPingLoop();
     lastPid = null;
   } catch (e: any) {
     showMessage(String(e), true);
@@ -293,21 +254,20 @@ btnStop.addEventListener('click', async () => {
     await invoke('stop_proxy');
     showMessage('Stopped');
     stopPingLoop();
+    stopUptimeTimer();
     lastPid = null;
     pingValue.textContent = '-';
+    trafficValue.textContent = '↑ 0 B/s  ↓ 0 B/s';
+    totalTrafficValue.textContent = '↑ 0 B  ↓ 0 B';
   } catch (e: any) {
     showMessage(String(e), true);
   }
 });
 
-btnSettings.addEventListener('click', () => showView('settings'));
+btnSettings.addEventListener('click', openSettings);
 btnLog.addEventListener('click', () => showView('log'));
 btnBackFromLog.addEventListener('click', () => showView('main'));
 btnRefreshLog.addEventListener('click', refreshLog);
-btnBackFromSettings.addEventListener('click', async () => {
-  await loadProfiles();
-  showView('main');
-});
 
 mainProfileSelect.addEventListener('change', async () => {
   try {
@@ -318,10 +278,23 @@ mainProfileSelect.addEventListener('change', async () => {
   }
 });
 
-// Settings save button
-document.getElementById('btn-save-config')?.addEventListener('click', saveProfileConfig);
-
 // ── Init ─────────────────────────────────────────────────────
+async function loadProfiles() {
+  try {
+    const store = await invoke<{ profiles: { name: string; is_active: boolean }[]; active_profile: string }>('get_profiles');
+    mainProfileSelect.innerHTML = '';
+    store.profiles.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.name;
+      opt.textContent = p.name;
+      if (p.name === store.active_profile) opt.selected = true;
+      mainProfileSelect.appendChild(opt);
+    });
+  } catch (e) {
+    console.error('Failed to load profiles:', e);
+  }
+}
+
 (async () => {
   await loadProfiles();
   await updateStatus();
