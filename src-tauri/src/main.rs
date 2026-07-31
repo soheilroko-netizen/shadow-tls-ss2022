@@ -48,9 +48,9 @@ fn no_window(cmd: &mut Command) -> &mut Command {
 // ── Config ───────────────────────────────────────────────────────────
 
 fn app_config_dir() -> Result<PathBuf> {
-    let d = directories::ProjectDirs::from("com", "amameborne", "amameborne")
-        .ok_or_else(|| anyhow::anyhow!("no config dir"))?
-        .config_dir()
+    let d = std::env::current_exe()?
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("no exe dir"))?
         .to_path_buf();
     fs::create_dir_all(&d)?;
     Ok(d)
