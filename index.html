@@ -1,141 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>dakal-tls v5</title>
-    <link rel="stylesheet" href="/src/styles.css" />
+    <title>AMAMEBORNE VPN</title>
   </head>
-  <body class="main-window">
+  <body>
     <div id="app">
-      <!-- ═══ Main View ═══ -->
-      <div class="container" id="main-view">
-        <h1>shado v5</h1>
-        <p class="subtitle">ShadowTLS + Hysteria2 VPN</p>
-
-        <!-- App Header: Server + Protocol Selection -->
-        <div class="app-header">
-          <div class="profile-bar-main" style="margin-bottom: 10px;">
-            <select id="server-selector" style="flex:1;padding:8px;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;font-size:13px;">
-              <option value="germany-1">Germany #1</option>
-              <option value="finland-1">Finland #1</option>
-            </select>
-            <button id="btn-settings-toggle" class="btn-small">Settings</button>
-            <button id="btn-main-log" class="btn-small">Log</button>
-          </div>
-
-          <!-- Protocol Tabs -->
-          <div class="protocol-tabs">
-            <button class="tab active" data-protocol="h2">Hysteria2</button>
-            <button class="tab" data-protocol="stls">ShadowTLS</button>
-          </div>
-        </div>
-
-        <!-- Settings Panel (collapsible) -->
-        <div id="settings-panel" style="display:none;margin-bottom:10px;padding:12px;background:#1a1a2e;border-radius:6px;border:1px solid #333;">
-          <h3 style="margin:0 0 8px;color:#fff;font-size:14px;">Settings</h3>
-          
-          <div style="margin-bottom:8px;">
-            <label style="display:block;color:#888;font-size:11px;margin-bottom:4px;">Split Tunneling</label>
-            <select id="setting-split-mode" style="width:100%;padding:6px;background:#0f0f1e;color:#fff;border:1px solid #444;border-radius:4px;font-size:12px;">
-              <option value="full">Full Tunnel (everything through VPN)</option>
-              <option value="iran">Iran Direct (bypass VPN for Iran)</option>
-              <option value="custom">Custom Rules</option>
-            </select>
-          </div>
-
-          <div id="custom-rules-container" style="display:none;margin-bottom:8px;">
-            <label style="display:block;color:#888;font-size:11px;margin-bottom:4px;">Custom Split Rules (one domain per line)</label>
-            <textarea id="setting-split-rules" placeholder="example.com&#10;google.com" rows="3" style="width:100%;padding:6px;background:#0f0f1e;color:#fff;border:1px solid #444;border-radius:4px;font-size:11px;font-family:monospace;resize:vertical;"></textarea>
-          </div>
-
-          <div style="margin-bottom:8px;">
-            <label style="display:block;color:#888;font-size:11px;margin-bottom:4px;">MTU (leave empty for auto-detect)</label>
-            <input type="number" id="setting-mtu" placeholder="Auto" style="width:100%;padding:6px;background:#0f0f1e;color:#fff;border:1px solid #444;border-radius:4px;font-size:12px;" />
-          </div>
-
-          <div style="display:flex;gap:8px;margin-bottom:8px;">
-            <button id="btn-update-geofiles" style="display:none;flex:1;padding:6px;font-size:11px;background:#1a1a2e;color:#ffaa00;border:1px solid #444;border-radius:4px;cursor:pointer;">Update Iran Domains</button>
-            <button id="btn-save-settings" class="btn btn-secondary" style="flex:2;padding:6px;font-size:12px;">Save Settings</button>
-          </div>
-        </div>
-
-        <div id="h2-preset-selector" style="display:none;margin:6px 0;padding:8px;background:#1a1a2e;border-radius:6px;border:1px solid #333;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <label style="color:#888;font-size:11px;">H2 Preset:</label>
-            <select id="h2-preset-dropdown" style="flex:1;padding:4px 8px;background:#0f0f1e;color:#fff;border:1px solid #444;border-radius:4px;font-size:11px;">
-              <option value="adsl">ADSL (↑4 / ↓16 Mbps)</option>
-              <option value="4g">4G (↑15 / ↓30 Mbps)</option>
-              <option value="5g" selected>5G/Fiber (↑40 / ↓80 Mbps)</option>
-              <option value="max">Max (↑80 / ↓120 Mbps)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Status Banner -->
-        <div class="status-card">
-          <div class="status-indicator" id="status-dot"></div>
-          <span id="status-text">Disconnected</span>
-          <span class="status-address" id="status-address"></span>
-          
-          <!-- Split Tunnel Indicator -->
-          <svg class="split-indicator" id="split-indicator" viewBox="0 0 24 24" title="Full tunnel">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="split-indicator" id="split-indicator" title="Full tunnel">
+          <svg viewBox="0 0 24 24" width="20" height="20">
             <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
             <path class="split-path" d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="1.5"/>
           </svg>
         </div>
+        <h1 class="app-logo">AMAMEBORNE</h1>
+        <button class="menu-toggle" id="menu-toggle">
+          <svg viewBox="0 0 24 24" width="24" height="24">
+            <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </header>
 
-        <!-- Metrics Grid -->
-        <div class="metrics-grid">
-          <div class="metric-tile">
-            <div class="metric-value" id="ping-value">-</div>
+      <!-- Main Content -->
+      <main class="app-main">
+        <!-- Big Toggle Switch -->
+        <div class="toggle-card">
+          <div class="toggle-switch" id="toggle-switch">
+            <div class="toggle-track">
+              <div class="toggle-thumb"></div>
+            </div>
+          </div>
+          <div class="toggle-status" id="toggle-status">Disconnected</div>
+          <div class="toggle-uptime" id="toggle-uptime">--:--</div>
+        </div>
+
+        <!-- Server Info + Protocol Tabs -->
+        <div class="server-bar">
+          <div class="server-address" id="server-address">
+            <svg viewBox="0 0 24 24" width="16" height="16" class="pin-icon">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor"/>
+              <circle cx="12" cy="9" r="2.5" fill="#0a0e1a"/>
+            </svg>
+            <span id="server-text">--</span>
+          </div>
+          <div class="protocol-tabs">
+            <button class="protocol-tab active" data-protocol="h2">H2</button>
+            <button class="protocol-tab" data-protocol="stls">STLS</button>
+          </div>
+        </div>
+
+        <!-- Flag Buttons (Server Selection) -->
+        <div class="flag-buttons">
+          <button class="flag-btn active" data-server="germany-1">
+            <span class="flag">🇩🇪</span>
+            <span class="flag-label">#1</span>
+          </button>
+          <button class="flag-btn" data-server="finland-1">
+            <span class="flag">🇫🇮</span>
+            <span class="flag-label">#1</span>
+          </button>
+        </div>
+
+        <!-- H2 Preset (visible only for Hysteria2) -->
+        <div class="h2-preset" id="h2-preset">
+          <label>H2 Preset:</label>
+          <select id="h2-preset-select">
+            <option value="adsl">ADSL</option>
+            <option value="4g" selected>4G</option>
+            <option value="5g">5G</option>
+            <option value="max">MAX</option>
+          </select>
+          <div class="speed-badges">
+            <span class="badge badge-up" id="speed-up">↑15</span>
+            <span class="badge badge-down" id="speed-down">↓30</span>
+          </div>
+        </div>
+
+        <!-- Metric Cards (Upload, Download, Ping) -->
+        <div class="metric-cards">
+          <div class="metric-card">
+            <div class="metric-icon">📈</div>
+            <canvas class="metric-graph" id="graph-up" width="80" height="40"></canvas>
+            <div class="metric-value" id="metric-up">0 B/s</div>
+            <div class="metric-label">Upload</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">📉</div>
+            <canvas class="metric-graph" id="graph-down" width="80" height="40"></canvas>
+            <div class="metric-value" id="metric-down">0 B/s</div>
+            <div class="metric-label">Download</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">⚡</div>
+            <div class="metric-value ping" id="metric-ping">-- ms</div>
             <div class="metric-label">Ping</div>
           </div>
-          <div class="metric-tile">
-            <div class="metric-value" id="uptime-value">-</div>
-            <div class="metric-label">Uptime</div>
-          </div>
-          <div class="metric-tile">
-            <div class="metric-value" id="traffic-up-value">0 B/s</div>
-            <canvas class="sparkline" id="sparkline-up" width="100" height="24"></canvas>
-            <div class="metric-label">↑ Upload</div>
-          </div>
-          <div class="metric-tile">
-            <div class="metric-value" id="traffic-down-value">0 B/s</div>
-            <canvas class="sparkline" id="sparkline-down" width="100" height="24"></canvas>
-            <div class="metric-label">↓ Download</div>
-          </div>
         </div>
 
-        <div class="controls">
-          <button id="btn-start" class="btn btn-primary">Start</button>
-          <button id="btn-stop" class="btn btn-secondary" disabled>Stop</button>
-        </div>
-
-        <div id="message" class="message"></div>
-
-        <!-- Inline Log Panel -->
-        <div class="log-section" id="log-section">
-          <button class="log-toggle" id="log-toggle">
-            <span>Show Logs</span>
-            <svg class="chevron" viewBox="0 0 24 24" width="16" height="16">
-              <path d="M7 10l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none"/>
+        <!-- Footer Buttons -->
+        <div class="footer-actions">
+          <button class="footer-btn" id="btn-settings">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z" fill="currentColor"/>
             </svg>
+            Settings
           </button>
-          <pre class="log-content" id="inline-log-content"></pre>
+          <button class="footer-btn" id="btn-logs">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/>
+            </svg>
+            Logs
+          </button>
         </div>
-      </div>
 
-      <!-- ═══ Log View ═══ -->
-      <div class="container" id="log-view" style="display:none">
-        <h1>Connection Log</h1>
-        <p class="subtitle">sing-box runtime logs</p>
-        <div class="controls">
-          <button id="btn-refresh-log" class="btn btn-secondary">Refresh</button>
-          <button id="btn-back-from-log" class="btn btn-secondary">Back</button>
+        <!-- Expandable Settings Panel -->
+        <div class="expandable-panel" id="settings-panel">
+          <div class="panel-header">
+            <h3>Settings</h3>
+            <button class="panel-close" data-panel="settings-panel">×</button>
+          </div>
+          <div class="panel-content">
+            <div class="setting-group">
+              <label for="setting-split-mode">Split Tunnel Mode</label>
+              <select id="setting-split-mode">
+                <option value="full">Full Tunnel</option>
+                <option value="iran">Iran Direct</option>
+                <option value="custom">Custom Rules</option>
+              </select>
+            </div>
+            <div class="setting-group" id="custom-rules-group" style="display: none;">
+              <label for="setting-split-rules">Custom Rules (one per line)</label>
+              <textarea id="setting-split-rules" rows="4"></textarea>
+            </div>
+            <div class="setting-group">
+              <label for="setting-mtu">MTU (optional)</label>
+              <input type="number" id="setting-mtu" placeholder="1500" />
+            </div>
+            <button class="btn-primary" id="btn-save-settings">Save Settings</button>
+            <button class="btn-secondary" id="btn-update-geofiles" style="display: none;">Update Geofiles</button>
+          </div>
         </div>
-        <pre id="log-content" class="log-content"></pre>
-      </div>
+
+        <!-- Expandable Logs Panel -->
+        <div class="expandable-panel" id="logs-panel">
+          <div class="panel-header">
+            <h3>Logs</h3>
+            <button class="panel-close" data-panel="logs-panel">×</button>
+          </div>
+          <div class="panel-content">
+            <pre class="log-content" id="log-content">No logs available</pre>
+            <button class="btn-secondary" id="btn-refresh-logs">Refresh</button>
+          </div>
+        </div>
+
+        <!-- Message Toast -->
+        <div class="message-toast" id="message-toast"></div>
+      </main>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
