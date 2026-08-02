@@ -2,6 +2,7 @@
 // AMAMEBORNE VPN - Main TypeScript
 // ══════════════════════════════════════════════════════════
 
+import './styles.css';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
