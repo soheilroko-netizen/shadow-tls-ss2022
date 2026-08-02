@@ -28,8 +28,14 @@ jobs:
 
       - name: Download sing-box
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $release = Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/releases/latest" -Headers @{"User-Agent"="stls"}
+          $headers = @{
+            "User-Agent" = "stls"
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          }
+          $release = Invoke-RestMethod "https://api.github.com/repos/SagerNet/sing-box/releases/latest" -Headers $headers
           $tag = $release.tag_name.TrimStart('v')
           Write-Host "sing-box version: $tag"
           $zip = "sing-box-$tag-windows-amd64.zip"
