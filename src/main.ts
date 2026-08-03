@@ -70,6 +70,12 @@ const graphDown = document.getElementById('graph-down') as HTMLCanvasElement;
 const btnSettings = document.getElementById('btn-settings')!;
 const btnLogs = document.getElementById('btn-logs')!;
 
+// DNS
+const btnDnsGermany = document.getElementById('btn-dns-germany')!;
+const btnDnsFinland = document.getElementById('btn-dns-finland')!;
+const btnDnsReset = document.getElementById('btn-dns-reset')!;
+const dnsStatus = document.getElementById('dns-status')!;
+
 // Panels
 const settingsPanel = document.getElementById('settings-panel')!;
 const logsPanel = document.getElementById('logs-panel')!;
@@ -461,6 +467,32 @@ panelCloses.forEach(btn => {
   });
 });
 
+// ── DNS Controls ─────────────────────────────────────────
+async function applyDns(profile: string) {
+  try {
+    dnsStatus.textContent = 'DNS: Applying...';
+    await invoke('apply_dns', { profile });
+    await updateDnsStatus();
+    showMessage(`DNS applied: ${profile}`);
+  } catch (err: any) {
+    showMessage(`DNS failed: ${err}`);
+    dnsStatus.textContent = 'DNS: Error';
+  }
+}
+
+async function updateDnsStatus() {
+  try {
+    const status = await invoke<string>('get_current_dns');
+    dnsStatus.textContent = `DNS: ${status}`;
+  } catch (err) {
+    dnsStatus.textContent = 'DNS: Unknown';
+  }
+}
+
+btnDnsGermany.addEventListener('click', () => applyDns('germany'));
+btnDnsFinland.addEventListener('click', () => applyDns('finland'));
+btnDnsReset.addEventListener('click', () => applyDns('reset'));
+
 // ── Event Listeners ──────────────────────────────────────
 listen('proxy-log', (event: { payload: string }) => {
   if (logsPanel.classList.contains('open')) {
@@ -473,6 +505,7 @@ listen('proxy-log', (event: { payload: string }) => {
 (async () => {
   await loadProfile();
   await pollStatus();
+  await updateDnsStatus();
   
   // Load H2 preset from config
   try {

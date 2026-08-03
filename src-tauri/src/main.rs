@@ -434,10 +434,89 @@ fn list_profiles() -> Result<Vec<String>, String> {
     ])
 }
 
+#[tauri::command]
+fn apply_dns(profile: String) -> Result<String, String> {
+    use std::process::Command;
+    
+    let bat_name = match profile.as_str() {
+        "germany" => "doh_germany.bat",
+        "finland" => "doh_finland.bat",
+        "reset" => "doh_reset.bat",
+        _ => return Err(format!("Unknown DNS profile: {}", profile)),
+    };
+    
+    // Get resource path
+    let resource_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .ok_or("Failed to get exe directory")?;
+    
+    let bat_path = resource_dir.join("resources").join(bat_name);
+    
+    if !bat_path.exists() {
+        return Err(format!("DNS script not found: {:?}", bat_path));
+    }
+    
+    // Execute batch file
+    let output = Command::new("cmd")
+        .args(["/C", bat_path.to_str().unwrap()])
+        .output()
+        .map_err(|e| format!("Failed to execute DNS script: {}", e))?;
+    
+    if !output.status.success() {
+        return Err(format!("DNS script failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+    
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+fn get_current_dns() -> Result<String, String> {
+    use std::process::Command;
+    
+    // Get active adapter interface name
+    let route_output = Command::new("cmd")
+        .args(["/C", "route print 0.0.0.0 | findstr /C:\"0.0.0.0\""])
+        .output()
+        .map_err(|e| format!("Failed to get route: {}", e))?;
+    
+    let route_str = String::from_utf8_lossy(&route_output.stdout);
+    let iface = route_str
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(3))
+        .ok_or("No active adapter found")?;
+    
+    // Get DNS servers for the interface
+    let dns_output = Command::new("netsh")
+        .args(["interface", "ipv4", "show", "dnsservers", &format!("name={}", iface)])
+        .output()
+        .map_err(|e| format!("Failed to get DNS: {}", e))?;
+    
+    let dns_str = String::from_utf8_lossy(&dns_output.stdout);
+    
+    // Parse DNS servers
+    if dns_str.contains("DHCP") {
+        Ok("Auto (DHCP)".to_string())
+    } else {
+        let servers: Vec<&str> = dns_str
+            .lines()
+            .filter(|line| line.trim().chars().next().map_or(false, |c| c.is_numeric()))
+            .map(|line| line.trim())
+            .collect();
+        
+        if servers.is_empty() {
+            Ok("Auto (DHCP)".to_string())
+        } else {
+            Ok(servers.join(", "))
+        }
+    }
+}
+
 fn create_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("AMAMEBORNE VPN")
-        .inner_size(520.0, 680.0)
+        .inner_size(520.0, 760.0)
         .resizable(false)
         .build()?;
     Ok(())
@@ -598,6 +677,8 @@ fn main() {
             update_geofiles,
             get_h2_speeds,
             apply_h2_preset,
+            apply_dns,
+            get_current_dns,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri app");

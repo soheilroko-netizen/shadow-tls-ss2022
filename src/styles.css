@@ -69,7 +69,7 @@ body {
 
 #app {
   width: 520px;
-  height: 680px;
+  height: 760px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -568,6 +568,65 @@ select:focus, input:focus, textarea:focus {
 
 .footer-btn svg {
   flex-shrink: 0;
+}
+
+/* ── DNS Section ────────────────────────────────────────── */
+.dns-section {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.dns-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.dns-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--spacing-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  min-height: 56px;
+}
+
+.dns-btn .flag {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.dns-btn:hover {
+  background: var(--bg-primary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.dns-btn:active {
+  transform: translateY(0);
+}
+
+.dns-status {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: var(--spacing-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Expandable Panels ──────────────────────────────────── */
