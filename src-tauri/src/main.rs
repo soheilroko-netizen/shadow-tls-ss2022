@@ -472,9 +472,6 @@ fn main() {
             is_running_cache: Mutex::new(false),
         })
         .setup(|app| {
-            let show_item = MenuItemBuilder::with_id("show", "Show").build(app)?;
-            let hide_item = MenuItemBuilder::with_id("hide", "Hide").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let profile_startup = config::load_profile();
             
             // Parse profile for startup menu
@@ -488,7 +485,7 @@ fn main() {
                 ("Unknown", "Unknown")
             };
             
-            let menu = build_tray_menu(app, false, server_name, protocol_name);
+            let menu = build_tray_menu(app.handle(), false, server_name, protocol_name);
 
             let _tray = TrayIconBuilder::with_id("main")
                 .tooltip("dakal-tls VPN")

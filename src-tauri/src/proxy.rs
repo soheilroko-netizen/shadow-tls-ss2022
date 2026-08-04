@@ -2,7 +2,6 @@
 use anyhow::{bail, Context, Result};
 use crate::config::Config;
 use crate::sysdns;
-use directories::ProjectDirs;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::ToSocketAddrs;
