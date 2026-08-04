@@ -52,6 +52,8 @@ impl ProxyManager {
             debug_log_path: config_dir.join("dakal-tls-debug.log"),
         })
     }
+
+    pub fn is_running(&self) -> bool {
         let mut guard = self.child.lock().unwrap();
         if let Some(child) = guard.as_mut() {
             match child.try_wait() {
@@ -464,5 +466,3 @@ fn resolve_hostname(host: &str) -> Result<Vec<String>> {
 }
 
 // ── tests ────────────────────────────────────────────────────────────
-
-
