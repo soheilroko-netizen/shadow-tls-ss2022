@@ -70,7 +70,46 @@ struct AppState {
     is_running_cache: Mutex<bool>,
 }
 
-// ── Tray menu rebuild helper ───────────────────────────────────
+// ── Tray menu helpers ────────────────────────────────────────────
+
+fn build_tray_menu(app: &tauri::AppHandle, running: bool, server_name: &str, protocol_name: &str) -> tauri::menu::Menu<tauri::Wry> {
+    let show = MenuItemBuilder::with_id("show", "Show").build(app).unwrap();
+    let hide = MenuItemBuilder::with_id("hide", "Hide").build(app).unwrap();
+    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app).unwrap();
+    let server_item = MenuItemBuilder::with_id("server", server_name)
+        .enabled(false)
+        .build(app)
+        .unwrap();
+    let protocol_item = MenuItemBuilder::with_id("protocol", protocol_name)
+        .enabled(false)
+        .build(app)
+        .unwrap();
+
+    let builder = MenuBuilder::new(app)
+        .item(&server_item)
+        .item(&protocol_item);
+
+    let builder = if running {
+        let disc = MenuItemBuilder::with_id("disconnect", "Disconnect")
+            .build(app)
+            .unwrap();
+        builder.item(&disc)
+    } else {
+        let conn = MenuItemBuilder::with_id("connect", "Connect")
+            .build(app)
+            .unwrap();
+        builder.item(&conn)
+    };
+
+    builder
+        .separator()
+        .item(&show)
+        .item(&hide)
+        .separator()
+        .item(&quit)
+        .build()
+        .unwrap()
+}
 
 fn update_tray_state(app: &tauri::AppHandle) {
     let state: tauri::State<AppState> = app.state::<AppState>();
@@ -96,49 +135,7 @@ fn update_tray_state(app: &tauri::AppHandle) {
         "dakal-tls VPN".to_string()
     };
 
-    let show = MenuItemBuilder::with_id("show", "Show").build(app).unwrap();
-    let hide = MenuItemBuilder::with_id("hide", "Hide").build(app).unwrap();
-    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app).unwrap();
-    let server_item = MenuItemBuilder::with_id("server", server_name)
-        .enabled(false)
-        .build(app)
-        .unwrap();
-    let protocol_item = MenuItemBuilder::with_id("protocol", protocol_name)
-        .enabled(false)
-        .build(app)
-        .unwrap();
-
-    let menu = if running {
-        let disc = MenuItemBuilder::with_id("disconnect", "Disconnect")
-            .build(app)
-            .unwrap();
-        MenuBuilder::new(app)
-            .item(&server_item)
-            .item(&protocol_item)
-            .item(&disc)
-            .separator()
-            .item(&show)
-            .item(&hide)
-            .separator()
-            .item(&quit)
-            .build()
-            .unwrap()
-    } else {
-        let conn = MenuItemBuilder::with_id("connect", "Connect")
-            .build(app)
-            .unwrap();
-        MenuBuilder::new(app)
-            .item(&server_item)
-            .item(&protocol_item)
-            .item(&conn)
-            .separator()
-            .item(&show)
-            .item(&hide)
-            .separator()
-            .item(&quit)
-            .build()
-            .unwrap()
-    };
+    let menu = build_tray_menu(app, running, server_name, protocol_name);
 
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(&tooltip));
@@ -393,8 +390,8 @@ fn update_settings(mtu: Option<u32>, split_mode: String, split_rules: Vec<String
         geofiles::download_geofiles().map_err(|e| format!("Failed to download geofiles: {}", e))?;
     }
     
-    // TODO: Save settings to config (per-profile or global)
-    // For now just validate
+    // Save settings to config
+    config::save_settings(mtu, split_mode, split_rules).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -479,25 +476,19 @@ fn main() {
             let hide_item = MenuItemBuilder::with_id("hide", "Hide").build(app)?;
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let profile_startup = config::load_profile();
-            let mode_startup = if profile_startup.ends_with("-h2") { "hysteria2" } else { "shadowtls" };
-            let mode_item = MenuItemBuilder::with_id("mode", mode_startup)
-                .enabled(false)
-                .build(app)?;
-            let connect_item = MenuItemBuilder::with_id("connect", "Connect").build(app)?;
-            let disconnect_item = MenuItemBuilder::with_id("disconnect", "Disconnect")
-                .enabled(false)
-                .build(app)?;
-
-            let menu = MenuBuilder::new(app)
-                .item(&mode_item)
-                .item(&connect_item)
-                .item(&disconnect_item)
-                .separator()
-                .item(&show_item)
-                .item(&hide_item)
-                .separator()
-                .item(&quit_item)
-                .build()?;
+            
+            // Parse profile for startup menu
+            let (server_name, protocol_name) = if profile_startup.starts_with("germany") {
+                let proto = if profile_startup.ends_with("-h2") { "Hysteria2" } else { "ShadowTLS" };
+                ("Germany #1", proto)
+            } else if profile_startup.starts_with("finland") {
+                let proto = if profile_startup.ends_with("-h2") { "Hysteria2" } else { "ShadowTLS" };
+                ("Finland #1", proto)
+            } else {
+                ("Unknown", "Unknown")
+            };
+            
+            let menu = build_tray_menu(app, false, server_name, protocol_name);
 
             let _tray = TrayIconBuilder::with_id("main")
                 .tooltip("dakal-tls VPN")

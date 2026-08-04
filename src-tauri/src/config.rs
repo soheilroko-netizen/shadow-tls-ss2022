@@ -47,11 +47,17 @@ pub struct SplitRule {
     pub folder_paths: Vec<String>,
 }
 
-fn config_path() -> Result<PathBuf> {
+/// Get config directory path
+pub fn config_dir() -> Result<PathBuf> {
     let proj_dirs = ProjectDirs::from("com", "stls", "stls")
         .ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
-    let config_dir = proj_dirs.config_dir();
-    fs::create_dir_all(config_dir)?;
+    Ok(proj_dirs.config_dir().to_path_buf())
+}
+
+/// Get config file path
+pub fn config_path() -> Result<PathBuf> {
+    let config_dir = config_dir()?;
+    fs::create_dir_all(&config_dir)?;
     Ok(config_dir.join("config.json"))
 }
 
@@ -125,7 +131,26 @@ pub fn h2_auto_default() -> bool { false }
 pub fn get_profile_config(profile: &str) -> Config {
     let (up, down) = load_h2_speeds();
     
-    match profile {
+    // Load saved settings from config.json
+    let path = config_path().ok();
+    let saved_settings = path.and_then(|p| {
+        if p.exists() {
+            fs::read_to_string(&p).ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        } else {
+            None
+        }
+    });
+    
+    let saved_mtu = saved_settings.as_ref().and_then(|v| v["mtu"].as_u64()).map(|m| m as u32);
+    let saved_split_mode = saved_settings.as_ref().and_then(|v| v["split_mode"].as_str()).map(|s| s.to_string());
+    let saved_split_rules = saved_settings.as_ref().and_then(|v| {
+        v["split_rules"].as_array().map(|arr| {
+            arr.iter().filter_map(|r| r["pattern"].as_str().map(|p| SplitRule { pattern: p.to_string(), process_names: vec![], folder_paths: vec![] })).collect()
+        })
+    });
+    
+    let base_config = match profile {
         "germany-1-stls" => Config {
             server_address: "ns.baft.uk".to_string(),
             ss_port: 8380,
@@ -134,9 +159,9 @@ pub fn get_profile_config(profile: &str) -> Config {
             stls_password: "y2lachetore".to_string(),
             stls_sni: "dl.google.com".to_string(),
             socks5_port: 1080,
-            mtu: None,
-            split_mode: "full".to_string(),
-            split_rules: vec![],
+            mtu: saved_mtu,
+            split_mode: saved_split_mode.unwrap_or_else(|| "full".to_string()),
+            split_rules: saved_split_rules.unwrap_or_default(),
             mode: "shadowtls".to_string(),
             h2_port: 40001,
             h2_password: "".to_string(),
@@ -157,9 +182,9 @@ pub fn get_profile_config(profile: &str) -> Config {
             stls_password: "".to_string(),
             stls_sni: "".to_string(),
             socks5_port: 1080,
-            mtu: None,
-            split_mode: "full".to_string(),
-            split_rules: vec![],
+            mtu: saved_mtu,
+            split_mode: saved_split_mode.unwrap_or_else(|| "full".to_string()),
+            split_rules: saved_split_rules.unwrap_or_default(),
             mode: "hysteria2".to_string(),
             h2_port: 40001,
             h2_password: "testpass1".to_string(),
@@ -180,9 +205,9 @@ pub fn get_profile_config(profile: &str) -> Config {
             stls_password: "y2lachetore".to_string(),
             stls_sni: "dl.google.com".to_string(),
             socks5_port: 1080,
-            mtu: None,
-            split_mode: "full".to_string(),
-            split_rules: vec![],
+            mtu: saved_mtu,
+            split_mode: saved_split_mode.unwrap_or_else(|| "full".to_string()),
+            split_rules: saved_split_rules.unwrap_or_default(),
             mode: "shadowtls".to_string(),
             h2_port: 40001,
             h2_password: "".to_string(),
@@ -203,9 +228,9 @@ pub fn get_profile_config(profile: &str) -> Config {
             stls_password: "".to_string(),
             stls_sni: "".to_string(),
             socks5_port: 1080,
-            mtu: None,
-            split_mode: "full".to_string(),
-            split_rules: vec![],
+            mtu: saved_mtu,
+            split_mode: saved_split_mode.unwrap_or_else(|| "full".to_string()),
+            split_rules: saved_split_rules.unwrap_or_default(),
             mode: "hysteria2".to_string(),
             h2_port: 40001,
             h2_password: "testpass1".to_string(),
@@ -219,7 +244,9 @@ pub fn get_profile_config(profile: &str) -> Config {
             h2_auto: false,
         },
         _ => get_profile_config("germany-1-stls"), // fallback
-    }
+    };
+    
+    base_config
 }
 
 /// Get config for active profile
@@ -235,7 +262,7 @@ pub fn load_mode() -> String {
     cfg.mode
 }
 
-/// Legacy: save mode (maps to profile switch)
+/// Save mode (maps to profile switch)
 pub fn save_mode(mode: &str) -> Result<()> {
     // When switching mode, keep current server
     let current = load_profile();
@@ -246,4 +273,27 @@ pub fn save_mode(mode: &str) -> Result<()> {
         _ => "germany-1-stls".to_string(),
     };
     save_profile(&new_profile)
+}
+
+/// Save settings (MTU, split mode, split rules) to config.json
+pub fn save_settings(mtu: Option<u32>, split_mode: String, split_rules: Vec<String>) -> Result<()> {
+    let path = config_path()?;
+    let mut existing = if path.exists() {
+        serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path)?)
+            .unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+    
+    if let Some(m) = mtu {
+        existing["mtu"] = serde_json::json!(m);
+    } else {
+        existing["mtu"] = serde_json::Value::Null;
+    }
+    
+    existing["split_mode"] = serde_json::json!(split_mode);
+    existing["split_rules"] = serde_json::json!(split_rules.iter().map(|p| serde_json::json!({ "pattern": p })).collect::<Vec<_>>());
+    
+    fs::write(&path, serde_json::to_string_pretty(&existing)?)?;
+    Ok(())
 }

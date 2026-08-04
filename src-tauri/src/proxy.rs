@@ -38,9 +38,7 @@ pub struct ProxyManager {
 impl ProxyManager {
     pub fn new() -> Result<Self> {
         let config = crate::config::get_active_config();
-        let config_dir = ProjectDirs::from("com", "dakal-tls", "dakal-tls")
-            .map(|d| d.config_dir().to_path_buf())
-            .unwrap_or_else(|| PathBuf::from("."));
+        let config_dir = crate::config::config_dir()?;
 
         fs::create_dir_all(&config_dir)?;
 
@@ -54,8 +52,6 @@ impl ProxyManager {
             debug_log_path: config_dir.join("dakal-tls-debug.log"),
         })
     }
-
-    pub fn is_running(&self) -> bool {
         let mut guard = self.child.lock().unwrap();
         if let Some(child) = guard.as_mut() {
             match child.try_wait() {
@@ -328,10 +324,16 @@ impl ProxyManager {
         let mut outbounds = Vec::new();
 
         if c.mode == "hysteria2" {
+            // Parse h2_mport (format: "start-end") or fallback to h2_port + 5000
+            let server_ports = if !c.h2_mport.is_empty() && c.h2_mport.contains('-') {
+                c.h2_mport.clone()
+            } else {
+                format!("{}:{}", c.h2_port, c.h2_port + 5000)
+            };
             let mut h2 = serde_json::json!({
                 "type": "hysteria2", "tag": "h2-out",
                 "server": c.server_address,
-                "server_ports": [format!("{}:{}", c.h2_port, c.h2_port + 5000)],
+                "server_ports": [server_ports],
                 "hop_interval": "30s",
                 "up_mbps": c.h2_up_mbps,
                 "down_mbps": c.h2_down_mbps,
