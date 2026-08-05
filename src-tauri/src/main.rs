@@ -7,6 +7,7 @@ mod sysdns;
 mod geofiles;
 
 use config::Config;
+use tauri::Emitter;
 #[cfg(target_os = "windows")]
 fn check_single_instance() {
     use std::ffi::CString;
@@ -173,7 +174,7 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
             // sing-box exited during timeout — error was likely immediate
             let already_failed = state_handle.connect_failed.lock().unwrap().is_some();
             if !already_failed {
-                *state_handle.connect_failed.lock() = Some("Connection failed — sing-box crashed or config error".into());
+                *state_handle.connect_failed.lock().unwrap() = Some("Connection failed — sing-box crashed or config error".into());
                 let _ = app_handle.emit("connect-failed", "Connection failed — sing-box crashed or config error");
                 update_tray_state(&app_handle);
             }
@@ -200,7 +201,7 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
         *state_handle.started_at.lock().unwrap() = None;
         *state_handle.prev_sample.lock().unwrap() = None;
         *state_handle.is_running_cache.lock().unwrap() = false;
-        *state_handle.connect_failed.lock() = Some("Connection failed — server unreachable or blocked".into());
+        *state_handle.connect_failed.lock().unwrap() = Some("Connection failed — server unreachable or blocked".into());
         let _ = app_handle.emit("connect-failed", "Connection failed — server unreachable or blocked");
         update_tray_state(&app_handle);
     });
