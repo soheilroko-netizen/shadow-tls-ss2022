@@ -164,8 +164,12 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
     update_tray_state(app);
 
     // Spawn connect timeout thread (10s)
-    let app_handle = app.clone();
-    let state_handle = app.state::<AppState>().inner().clone();
+    spawn_connect_timeout(app.clone(), app.state::<AppState>().inner().clone());
+
+    Ok(result)
+}
+
+fn spawn_connect_timeout(app_handle: tauri::AppHandle, state_handle: std::sync::Arc<AppState>) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(10));
         // Check if still running
@@ -205,8 +209,6 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
         let _ = app_handle.emit("connect-failed", "Connection failed — server unreachable or blocked");
         update_tray_state(&app_handle);
     });
-
-    Ok(result)
 }
 
 fn stop_proxy_inner(state: &State<AppState>) -> Result<String, String> {
