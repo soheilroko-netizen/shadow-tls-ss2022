@@ -185,8 +185,8 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
             }
             return;
         }
-        // Still running — check if any traffic flowed
-        let traffic_ok = http_client
+        // Still running — check if Clash API responds (means sing-box is alive + TUN active)
+        let api_alive = http_client
             .get("http://127.0.0.1:9097/connections")
             .header("Authorization", "Bearer dakal")
             .timeout(std::time::Duration::from_secs(2))
@@ -194,12 +194,12 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
             .ok()
             .and_then(|r| r.json::<serde_json::Value>().ok())
             .map(|v| {
-                let up = v["upload_total"].as_u64().unwrap_or(0);
-                let down = v["download_total"].as_u64().unwrap_or(0);
-                up > 0 || down > 0
+                // API responded = sing-box is running and TUN is up
+                // Even without user traffic, DNS queries create connections
+                v.get("upload_total").is_some() || v.get("connections").is_some()
             })
             .unwrap_or(false);
-        if traffic_ok { return; }
+        if api_alive { return; }
         // No traffic after 10s — kill
         let _ = proxy_arc.lock().unwrap().stop();
         *started_at_arc.lock().unwrap() = None;
@@ -277,10 +277,14 @@ fn get_full_status(state: State<AppState>) -> Result<FullStatus, String> {
 
     let connect_error = state.connect_failed.lock().unwrap().clone();
 
+    eprintln!("[stls] get_full_status: profile={}, running={}, connect_error={:?}", profile, running, connect_error);
+
     if !running {
         // Show server address on error so user knows which endpoint failed
         let server = if connect_error.is_some() {
-            config::get_active_config().server_address.clone().into()
+            let cfg = config::get_active_config();
+            eprintln!("[stls] get_full_status (error): server={}", cfg.server_address);
+            cfg.server_address.clone().into()
         } else {
             None
         };
@@ -292,6 +296,7 @@ fn get_full_status(state: State<AppState>) -> Result<FullStatus, String> {
     }
 
     let cfg = config::get_active_config();
+    eprintln!("[stls] get_full_status (running): server={}", cfg.server_address);
     let uptime_secs = state.started_at.lock().unwrap().map(|s| s.elapsed().as_secs()).unwrap_or(0);
 
     // Read last 100 log lines (cache: only re-read if file changed)

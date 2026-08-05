@@ -66,12 +66,17 @@ pub fn load_profile() -> String {
     match config_path() {
         Ok(path) if path.exists() => {
             let content = fs::read_to_string(&path).unwrap_or_default();
-            serde_json::from_str::<serde_json::Value>(&content)
+            let result = serde_json::from_str::<serde_json::Value>(&content)
                 .ok()
                 .and_then(|v| v["profile"].as_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| "germany-1-stls".to_string())
+                .unwrap_or_else(|| "germany-1-stls".to_string());
+            eprintln!("[stls] load_profile: '{}' from {}", result, path.display());
+            result
         }
-        _ => "germany-1-stls".to_string(),
+        _ => {
+            eprintln!("[stls] load_profile: no config file, defaulting to germany-1-stls");
+            "germany-1-stls".to_string()
+        }
     }
 }
 
@@ -86,6 +91,7 @@ pub fn save_profile(profile: &str) -> Result<()> {
     };
     existing["profile"] = serde_json::Value::String(profile.to_string());
     fs::write(&path, serde_json::to_string_pretty(&existing)?)?;
+    eprintln!("[stls] save_profile: wrote '{}' to {}", profile, path.display());
     Ok(())
 }
 
