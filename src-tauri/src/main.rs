@@ -36,7 +36,7 @@ fn check_single_instance() {
 #[cfg(not(target_os = "windows"))]
 fn check_single_instance() {}
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 static SING_BOX_CLIENT: std::sync::OnceLock<reqwest::blocking::Client> = std::sync::OnceLock::new();
@@ -63,14 +63,14 @@ struct TrafficSample {
 }
 
 struct AppState {
-    proxy: Mutex<ProxyManager>,
-    started_at: Mutex<Option<Instant>>,
-    prev_sample: Mutex<Option<TrafficSample>>,
+    proxy: Arc<Mutex<ProxyManager>>,
+    started_at: Arc<Mutex<Option<Instant>>>,
+    prev_sample: Arc<Mutex<Option<TrafficSample>>>,
     http_client: reqwest::blocking::Client,
-    cached_log: Mutex<(std::time::SystemTime, Vec<String>)>,
-    is_running_cache: Mutex<bool>,
-    connect_failed: Mutex<Option<String>>,
-    connect_started: Mutex<Option<Instant>>,
+    cached_log: Arc<Mutex<(std::time::SystemTime, Vec<String>)>>,
+    is_running_cache: Arc<Mutex<bool>>,
+    connect_failed: Arc<Mutex<Option<String>>>,
+    connect_started: Arc<Mutex<Option<Instant>>>,
 }
 
 // ── Tray menu helpers ────────────────────────────────────────────
@@ -164,29 +164,29 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
     update_tray_state(app);
 
     // Spawn connect timeout thread (10s)
-    spawn_connect_timeout(app.clone(), app.state::<AppState>().inner().clone());
-
-    Ok(result)
-}
-
-fn spawn_connect_timeout(app_handle: tauri::AppHandle, state_handle: std::sync::Arc<AppState>) {
+    // We need owned clones of the Arc fields for the thread
+    let proxy_arc = Arc::clone(&state.proxy);
+    let started_at_arc = Arc::clone(&state.started_at);
+    let prev_sample_arc = Arc::clone(&state.prev_sample);
+    let is_running_arc = Arc::clone(&state.is_running_cache);
+    let connect_failed_arc = Arc::clone(&state.connect_failed);
+    let http_client = state.http_client.clone();
+    let app_handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(10));
         // Check if still running
-        let still_running = state_handle.proxy.lock().unwrap().is_running();
+        let still_running = proxy_arc.lock().unwrap().is_running();
         if !still_running {
-            // sing-box exited during timeout — error was likely immediate
-            let already_failed = state_handle.connect_failed.lock().unwrap().is_some();
+            let already_failed = connect_failed_arc.lock().unwrap().is_some();
             if !already_failed {
-                *state_handle.connect_failed.lock().unwrap() = Some("Connection failed — sing-box crashed or config error".into());
+                *connect_failed_arc.lock().unwrap() = Some("Connection failed — sing-box crashed or config error".into());
                 let _ = app_handle.emit("connect-failed", "Connection failed — sing-box crashed or config error");
-                update_tray_state(&app_handle);
+                // Can't call update_tray_state easily from here, just emit
             }
             return;
         }
         // Still running — check if any traffic flowed
-        let client = &state_handle.http_client;
-        let traffic_ok = client
+        let traffic_ok = http_client
             .get("http://127.0.0.1:9097/connections")
             .header("Authorization", "Bearer dakal")
             .timeout(std::time::Duration::from_secs(2))
@@ -201,14 +201,15 @@ fn spawn_connect_timeout(app_handle: tauri::AppHandle, state_handle: std::sync::
             .unwrap_or(false);
         if traffic_ok { return; }
         // No traffic after 10s — kill
-        let _ = state_handle.proxy.lock().unwrap().stop();
-        *state_handle.started_at.lock().unwrap() = None;
-        *state_handle.prev_sample.lock().unwrap() = None;
-        *state_handle.is_running_cache.lock().unwrap() = false;
-        *state_handle.connect_failed.lock().unwrap() = Some("Connection failed — server unreachable or blocked".into());
+        let _ = proxy_arc.lock().unwrap().stop();
+        *started_at_arc.lock().unwrap() = None;
+        *prev_sample_arc.lock().unwrap() = None;
+        *is_running_arc.lock().unwrap() = false;
+        *connect_failed_arc.lock().unwrap() = Some("Connection failed — server unreachable or blocked".into());
         let _ = app_handle.emit("connect-failed", "Connection failed — server unreachable or blocked");
-        update_tray_state(&app_handle);
     });
+
+    Ok(result)
 }
 
 fn stop_proxy_inner(state: &State<AppState>) -> Result<String, String> {
@@ -523,17 +524,17 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
-            proxy: Mutex::new(proxy_manager),
-            started_at: Mutex::new(None),
-            prev_sample: Mutex::new(None),
+            proxy: Arc::new(Mutex::new(proxy_manager)),
+            started_at: Arc::new(Mutex::new(None)),
+            prev_sample: Arc::new(Mutex::new(None)),
             http_client: reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(3))
                 .build()
                 .unwrap(),
-            cached_log: Mutex::new((std::time::SystemTime::UNIX_EPOCH, Vec::new())),
-            is_running_cache: Mutex::new(false),
-            connect_failed: Mutex::new(None),
-            connect_started: Mutex::new(None),
+            cached_log: Arc::new(Mutex::new((std::time::SystemTime::UNIX_EPOCH, Vec::new()))),
+            is_running_cache: Arc::new(Mutex::new(false)),
+            connect_failed: Arc::new(Mutex::new(None)),
+            connect_started: Arc::new(Mutex::new(None)),
         })
         .setup(|app| {
             let profile_startup = config::load_profile();
