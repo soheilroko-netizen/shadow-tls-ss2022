@@ -15,6 +15,7 @@ interface FullStatus {
   total_up: number;
   total_down: number;
   log_lines: string[];
+  connect_error: string | null;
 }
 
 interface Config {
@@ -269,8 +270,14 @@ async function updateStatus() {
     const s = await invoke<FullStatus>('get_full_status');
     uptimeRefresh = Date.now();
 
-    // Handle connecting state
-    if (s.running && !hasPingResponse) {
+    // Handle connect_error state
+    if (s.connect_error && !s.running) {
+      statusText.textContent = 'Failed';
+      statusDot.classList.remove('connected');
+      statusDot.style.background = 'var(--danger)';
+      showMessage(s.connect_error, true);
+      hasPingResponse = false;
+    } else if (s.running && !hasPingResponse) {
       statusText.textContent = 'Connecting...';
       statusDot.classList.remove('connected');
       statusDot.style.background = 'var(--warning)';
@@ -285,8 +292,8 @@ async function updateStatus() {
       hasPingResponse = false;
     }
     
-    statusAddress.textContent = s.running && s.server ? s.server : '';
-    if (s.running && s.server) {
+    // Show server address when running or on connect_error
+    if ((s.running || s.connect_error) && s.server) {
       statusAddress.innerHTML = getServerFlag(s.server) + s.server;
     } else {
       statusAddress.textContent = '';
@@ -564,6 +571,21 @@ btnUpdateGeofiles.addEventListener('click', async () => {
 });
 
 // ── Events ───────────────────────────────────────────────────
+listen('connect-failed', (event: { payload: string }) => {
+  showMessage(event.payload, true);
+  statusText.textContent = 'Failed';
+  statusDot.classList.remove('connected');
+  statusDot.style.background = 'var(--danger)';
+  stopPingLoop();
+  stopUptimeTimer();
+  lastPid = null;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+  btnStartText.textContent = 'Start';
+  pingValue.textContent = '-';
+  trafficUpValue.textContent = '0 B/s';
+  trafficDownValue.textContent = '0 B/s';
+});
 listen('proxy-log', (event: { payload: string }) => {
   // Update inline log if expanded
   if (logSection.classList.contains('expanded')) {

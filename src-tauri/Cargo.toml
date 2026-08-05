@@ -21,7 +21,7 @@ directories = "5"
 anyhow = "1"
 
 # Tauri v2
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "emit"] }
 tauri-plugin-shell = "2"
 tauri-plugin-opener = "2"
 

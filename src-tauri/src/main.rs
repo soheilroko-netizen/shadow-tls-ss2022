@@ -68,6 +68,8 @@ struct AppState {
     http_client: reqwest::blocking::Client,
     cached_log: Mutex<(std::time::SystemTime, Vec<String>)>,
     is_running_cache: Mutex<bool>,
+    connect_failed: Mutex<Option<String>>,
+    connect_started: Mutex<Option<Instant>>,
 }
 
 // ── Tray menu helpers ────────────────────────────────────────────
@@ -155,8 +157,54 @@ fn start_proxy_inner(app: &tauri::AppHandle, state: &State<AppState>) -> Result<
     let result = proxy.start().map_err(|e| e.to_string())?;
     *state.started_at.lock().unwrap() = Some(Instant::now());
     *state.is_running_cache.lock().unwrap() = proxy.is_running();
+    *state.connect_failed.lock().unwrap() = None;
+    *state.connect_started.lock().unwrap() = Some(Instant::now());
     drop(proxy);
     update_tray_state(app);
+
+    // Spawn connect timeout thread (10s)
+    let app_handle = app.clone();
+    let state_handle = app.state::<AppState>().inner().clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(10));
+        // Check if still running
+        let still_running = state_handle.proxy.lock().unwrap().is_running();
+        if !still_running {
+            // sing-box exited during timeout — error was likely immediate
+            let already_failed = state_handle.connect_failed.lock().unwrap().is_some();
+            if !already_failed {
+                *state_handle.connect_failed.lock() = Some("Connection failed — sing-box crashed or config error".into());
+                let _ = app_handle.emit("connect-failed", "Connection failed — sing-box crashed or config error");
+                update_tray_state(&app_handle);
+            }
+            return;
+        }
+        // Still running — check if any traffic flowed
+        let client = &state_handle.http_client;
+        let traffic_ok = client
+            .get("http://127.0.0.1:9097/connections")
+            .header("Authorization", "Bearer dakal")
+            .timeout(std::time::Duration::from_secs(2))
+            .send()
+            .ok()
+            .and_then(|r| r.json::<serde_json::Value>().ok())
+            .map(|v| {
+                let up = v["upload_total"].as_u64().unwrap_or(0);
+                let down = v["download_total"].as_u64().unwrap_or(0);
+                up > 0 || down > 0
+            })
+            .unwrap_or(false);
+        if traffic_ok { return; }
+        // No traffic after 10s — kill
+        let _ = state_handle.proxy.lock().unwrap().stop();
+        *state_handle.started_at.lock().unwrap() = None;
+        *state_handle.prev_sample.lock().unwrap() = None;
+        *state_handle.is_running_cache.lock().unwrap() = false;
+        *state_handle.connect_failed.lock() = Some("Connection failed — server unreachable or blocked".into());
+        let _ = app_handle.emit("connect-failed", "Connection failed — server unreachable or blocked");
+        update_tray_state(&app_handle);
+    });
+
     Ok(result)
 }
 
@@ -166,6 +214,8 @@ fn stop_proxy_inner(state: &State<AppState>) -> Result<String, String> {
     *state.started_at.lock().unwrap() = None;
     *state.prev_sample.lock().unwrap() = None;
     *state.is_running_cache.lock().unwrap() = false;
+    *state.connect_failed.lock().unwrap() = None;
+    *state.connect_started.lock().unwrap() = None;
     Ok(result)
 }
 
@@ -221,11 +271,19 @@ fn get_full_status(state: State<AppState>) -> Result<FullStatus, String> {
     let profile = config::load_profile();
     let mode = if profile.ends_with("-h2") { "hysteria2" } else { "shadowtls" };
 
+    let connect_error = state.connect_failed.lock().unwrap().clone();
+
     if !running {
+        // Show server address on error so user knows which endpoint failed
+        let server = if connect_error.is_some() {
+            config::get_active_config().server_address.clone().into()
+        } else {
+            None
+        };
         return Ok(FullStatus {
-            running: false, mode: mode.to_string(), server: None, uptime_secs: 0, pid: None,
+            running: false, mode: mode.to_string(), server, uptime_secs: 0, pid: None,
             traffic_up: 0, traffic_down: 0, total_up: 0, total_down: 0,
-            log_lines: Vec::new(),
+            log_lines: Vec::new(), connect_error,
         });
     }
 
@@ -302,7 +360,7 @@ fn get_full_status(state: State<AppState>) -> Result<FullStatus, String> {
 
     Ok(FullStatus {
         running: true, mode: mode.to_string(), server: Some(cfg.server_address), uptime_secs, pid,
-        traffic_up, traffic_down, total_up: cur_up, total_down: cur_down, log_lines,
+        traffic_up, traffic_down, total_up: cur_up, total_down: cur_down, log_lines, connect_error,
     })
 }
 
@@ -318,6 +376,7 @@ struct FullStatus {
     total_up: u64,
     total_down: u64,
     log_lines: Vec<String>,
+    connect_error: Option<String>,
 }
 
 #[tauri::command]
@@ -470,6 +529,8 @@ fn main() {
                 .unwrap(),
             cached_log: Mutex::new((std::time::SystemTime::UNIX_EPOCH, Vec::new())),
             is_running_cache: Mutex::new(false),
+            connect_failed: Mutex::new(None),
+            connect_started: Mutex::new(None),
         })
         .setup(|app| {
             let profile_startup = config::load_profile();
